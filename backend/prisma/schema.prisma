@@ -1,0 +1,105 @@
+// Prisma Schema for Escrow Backend
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  phoneNumber         String   @id @map("phone_number")
+  walletAddress       String   @unique @map("wallet_address")
+  encryptedPrivateKey String   @map("encrypted_private_key")
+  pinHash             String   @map("pin_hash")
+  pinAttempts         Int      @default(0) @map("pin_attempts")
+  lockoutUntil        DateTime? @map("lockout_until")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  dealsAsSender   Deal[] @relation("SenderDeals")
+  dealsAsDriver   Deal[] @relation("DriverDeals")
+  dealsAsReceiver Deal[] @relation("ReceiverDeals")
+  actionLogs      DealActionLog[]
+  notifications   NotificationLog[]
+
+  @@map("users")
+}
+
+enum DealStatus {
+  Created
+  FundsLocked
+  Shipped
+  Delivered
+  Disputed
+  Released
+  Cancelled
+  Resolved
+}
+
+model Deal {
+  dealId             Int        @id @map("deal_id")
+  senderPhone        String     @map("sender_phone")
+  driverPhone        String     @map("driver_phone")
+  receiverPhone      String     @map("receiver_phone")
+  amount             Decimal    @db.Decimal(20, 2)
+  status             DealStatus
+  createdAt          DateTime   @default(now()) @map("created_at")
+  fundLockDeadline   DateTime   @map("fund_lock_deadline")
+  payoutReadyTime    DateTime?  @map("payout_ready_time")
+  disputeReasonCode  Int?       @map("dispute_reason_code")
+  txHashCreated      String     @map("tx_hash_created")
+  lastSyncedBlock    Int        @default(0) @map("last_synced_block")
+
+  sender             User       @relation("SenderDeals", fields: [senderPhone], references: [phoneNumber])
+  driver             User       @relation("DriverDeals", fields: [driverPhone], references: [phoneNumber])
+  receiver           User       @relation("ReceiverDeals", fields: [receiverPhone], references: [phoneNumber])
+
+  actionLogs         DealActionLog[]
+  notifications      NotificationLog[]
+
+  @@map("deals")
+}
+
+model DealActionLog {
+  id          Int      @id @default(autoincrement())
+  dealId      Int      @map("deal_id")
+  actorPhone  String   @map("actor_phone")
+  action      String
+  timestamp   DateTime @default(now())
+  txHash      String   @map("tx_hash")
+
+  deal        Deal     @relation(fields: [dealId], references: [dealId])
+  actor       User     @relation(fields: [actorPhone], references: [phoneNumber])
+
+  @@map("deal_action_log")
+}
+
+enum NotificationStatus {
+  Simulated_Sent
+  Pending
+  Failed
+}
+
+model NotificationLog {
+  id              Int                @id @default(autoincrement())
+  dealId          Int?               @map("deal_id")
+  recipientPhone  String             @map("recipient_phone")
+  message         String
+  sentAt          DateTime           @default(now()) @map("sent_at")
+  deliveryStatus  NotificationStatus @default(Simulated_Sent) @map("delivery_status")
+
+  deal            Deal?              @relation(fields: [dealId], references: [dealId])
+  recipient       User               @relation(fields: [recipientPhone], references: [phoneNumber])
+
+  @@map("notifications_log")
+}
+
+model SyncState {
+  id              Int      @id @default(autoincrement())
+  lastSyncedBlock Int      @default(0) @map("last_synced_block")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("sync_state")
+}

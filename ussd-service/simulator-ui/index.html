@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>USSD Simulator - Escrow Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .phones-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .phone {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .phone-header {
+            background: #2c3e50;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .phone-header h3 {
+            font-size: 1.1em;
+        }
+
+        .phone-number-input {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            color: white;
+            width: 150px;
+        }
+
+        .phone-body {
+            padding: 20px;
+        }
+
+        .screen {
+            background: #f0f0f0;
+            border: 2px solid #333;
+            border-radius: 10px;
+            padding: 15px;
+            min-height: 200px;
+            margin-bottom: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            color: #000;
+        }
+
+        .screen.empty {
+            color: #999;
+            font-style: italic;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .input-field {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-dial {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-dial:hover {
+            background: #229954;
+        }
+
+        .btn-send {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-send:hover {
+            background: #2980b9;
+        }
+
+        .btn-end {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-end:hover {
+            background: #c0392b;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+
+        .status.active {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+
+        .status.ended {
+            background: #fadbd8;
+            color: #e74c3c;
+        }
+
+        .status.error {
+            background: #ffeaa7;
+            color: #d63031;
+        }
+
+        .sms-inbox {
+            margin-top: 15px;
+            padding: 10px;
+            background: #ecf0f1;
+            border-radius: 5px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .sms-inbox h4 {
+            margin-bottom: 10px;
+            font-size: 0.9em;
+            color: #555;
+        }
+
+        .sms-message {
+            background: white;
+            padding: 8px;
+            margin-bottom: 5px;
+            border-radius: 3px;
+            font-size: 12px;
+            border-left: 3px solid #3498db;
+        }
+
+        .sms-time {
+            color: #999;
+            font-size: 10px;
+            margin-top: 3px;
+        }
+
+        .add-phone {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .add-phone button {
+            padding: 15px 30px;
+            font-size: 16px;
+        }
+
+        .shortcode {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #e67e22;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📱 USSD Simulator</h1>
+        <p>Agricultural Escrow Platform - Feature Phone Interface</p>
+        <p>Shortcode: <span class="shortcode">*384*96#</span></p>
+    </div>
+
+    <div class="container">
+        <div class="phones-grid" id="phonesGrid">
+            <!-- Phones will be added here dynamically -->
+        </div>
+
+        <div class="add-phone">
+            <button class="btn btn-dial" onclick="addPhone()">➕ Add Phone</button>
+        </div>
+    </div>
+
+    <script>
+        const USSD_API_URL = 'http://localhost:4000';
+        const BACKEND_API_URL = 'http://localhost:3000';
+        const SHORTCODE = '*384*96#';
+        let phoneCount = 0;
+        const phones = {};
+
+        // Initialize with 3 phones
+        window.onload = () => {
+            addPhone('+250788111111');
+            addPhone('+250788222222');
+            addPhone('+250788333333');
+        };
+
+        function generateSessionId() {
+            return 'sim_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        function addPhone(defaultNumber = '') {
+            phoneCount++;
+            const phoneId = `phone${phoneCount}`;
+            
+            const phoneDiv = document.createElement('div');
+            phoneDiv.className = 'phone';
+            phoneDiv.id = phoneId;
+            
+            phoneDiv.innerHTML = `
+                <div class="phone-header">
+                    <h3>Phone ${phoneCount}</h3>
+                    <input type="text" class="phone-number-input" id="${phoneId}-number" 
+                           value="${defaultNumber}" placeholder="+250788123456">
+                </div>
+                <div class="phone-body">
+                    <div class="status" id="${phoneId}-status">
+                        Ready to dial
+                    </div>
+                    <div class="screen empty" id="${phoneId}-screen">
+                        Dial ${SHORTCODE} to start
+                    </div>
+                    <div class="controls">
+                        <input type="text" class="input-field" id="${phoneId}-input" 
+                               placeholder="Enter digits..." maxlength="20">
+                        <button class="btn btn-dial" onclick="dial('${phoneId}')">Dial</button>
+                        <button class="btn btn-send" onclick="sendInput('${phoneId}')">Send</button>
+                        <button class="btn btn-end" onclick="endSession('${phoneId}')">End</button>
+                    </div>
+                    <div class="sms-inbox" id="${phoneId}-sms">
+                        <h4>📨 SMS Inbox</h4>
+                        <div id="${phoneId}-sms-messages"></div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('phonesGrid').appendChild(phoneDiv);
+            
+            phones[phoneId] = {
+                sessionId: null,
+                text: '',
+                phoneNumber: defaultNumber,
+            };
+
+            // Start SMS polling for this phone
+            if (defaultNumber) {
+                startSmsPolling(phoneId);
+            }
+        }
+
+        async function dial(phoneId) {
+            const phoneNumber = document.getElementById(`${phoneId}-number`).value.trim();
+            
+            if (!phoneNumber) {
+                alert('Please enter a phone number');
+                return;
+            }
+
+            phones[phoneId].sessionId = generateSessionId();
+            phones[phoneId].text = '';
+            phones[phoneId].phoneNumber = phoneNumber;
+
+            updateStatus(phoneId, 'Dialing...', 'active');
+
+            try {
+                const response = await fetch(`${USSD_API_URL}/ussd`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId: phones[phoneId].sessionId,
+                        phoneNumber: phoneNumber,
+                        text: '',
+                    }),
+                });
+
+                const message = await response.text();
+                displayMessage(phoneId, message);
+
+                if (message.startsWith('END')) {
+                    updateStatus(phoneId, 'Session ended', 'ended');
+                    phones[phoneId].sessionId = null;
+                } else {
+                    updateStatus(phoneId, 'Session active', 'active');
+                }
+
+                // Start SMS polling
+                startSmsPolling(phoneId);
+            } catch (error) {
+                console.error('Dial error:', error);
+                updateStatus(phoneId, 'Network error', 'error');
+                displayMessage(phoneId, 'END Network error. Please try again.');
+            }
+        }
+
+        async function sendInput(phoneId) {
+            const input = document.getElementById(`${phoneId}-input`).value.trim();
+            
+            if (!phones[phoneId].sessionId) {
+                alert('Please dial first');
+                return;
+            }
+
+            if (!input) {
+                alert('Please enter input');
+                return;
+            }
+
+            // Append to text
+            phones[phoneId].text = phones[phoneId].text ? 
+                `${phones[phoneId].text}*${input}` : input;
+
+            updateStatus(phoneId, 'Sending...', 'active');
+
+            try {
+                const response = await fetch(`${USSD_API_URL}/ussd`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId: phones[phoneId].sessionId,
+                        phoneNumber: phones[phoneId].phoneNumber,
+                        text: phones[phoneId].text,
+                    }),
+                });
+
+                const message = await response.text();
+                displayMessage(phoneId, message);
+
+                // Clear input
+                document.getElementById(`${phoneId}-input`).value = '';
+
+                if (message.startsWith('END')) {
+                    updateStatus(phoneId, 'Session ended', 'ended');
+                    phones[phoneId].sessionId = null;
+                    phones[phoneId].text = '';
+                } else {
+                    updateStatus(phoneId, 'Session active', 'active');
+                }
+            } catch (error) {
+                console.error('Send error:', error);
+                updateStatus(phoneId, 'Network error', 'error');
+                displayMessage(phoneId, 'END Network error. Please try again.');
+            }
+        }
+
+        function endSession(phoneId) {
+            phones[phoneId].sessionId = null;
+            phones[phoneId].text = '';
+            updateStatus(phoneId, 'Ready to dial', '');
+            displayMessage(phoneId, `Dial ${SHORTCODE} to start`);
+            document.getElementById(`${phoneId}-screen`).classList.add('empty');
+        }
+
+        function displayMessage(phoneId, message) {
+            const screen = document.getElementById(`${phoneId}-screen`);
+            
+            // Remove CON or END prefix
+            let display = message.replace(/^(CON|END)\s/, '');
+            
+            screen.textContent = display;
+            screen.classList.remove('empty');
+        }
+
+        function updateStatus(phoneId, text, statusClass) {
+            const status = document.getElementById(`${phoneId}-status`);
+            status.textContent = text;
+            status.className = 'status ' + statusClass;
+        }
+
+        // SMS polling
+        const smsPollers = {};
+
+        function startSmsPolling(phoneId) {
+            if (smsPollers[phoneId]) return; // Already polling
+
+            smsPollers[phoneId] = setInterval(async () => {
+                await fetchSms(phoneId);
+            }, 5000); // Poll every 5 seconds
+
+            // Initial fetch
+            fetchSms(phoneId);
+        }
+
+        async function fetchSms(phoneId) {
+            const phoneNumber = phones[phoneId].phoneNumber;
+            if (!phoneNumber) return;
+
+            try {
+                const response = await fetch(`${BACKEND_API_URL}/users/${encodeURIComponent(phoneNumber)}/notifications`);
+                const data = await response.json();
+
+                if (data.success && data.data) {
+                    displaySms(phoneId, data.data);
+                }
+            } catch (error) {
+                // Silent fail - backend might not be ready
+            }
+        }
+
+        function displaySms(phoneId, notifications) {
+            const container = document.getElementById(`${phoneId}-sms-messages`);
+            
+            if (!notifications || notifications.length === 0) {
+                container.innerHTML = '<div style="color: #999; font-size: 12px;">No messages</div>';
+                return;
+            }
+
+            container.innerHTML = notifications.slice(-5).map(notif => `
+                <div class="sms-message">
+                    ${notif.message}
+                    <div class="sms-time">${new Date(notif.sentAt).toLocaleTimeString()}</div>
+                </div>
+            `).join('');
+
+            // Auto-scroll to bottom
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // Enable Enter key to send
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const activeElement = document.activeElement;
+                if (activeElement && activeElement.classList.contains('input-field')) {
+                    const phoneId = activeElement.id.replace('-input', '');
+                    sendInput(phoneId);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
