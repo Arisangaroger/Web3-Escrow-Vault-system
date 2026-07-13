@@ -6,11 +6,10 @@ import { WalletsService } from '../src/modules/wallets/wallets.service';
 import { ContractsService } from '../src/modules/contracts/contracts.service';
 import { ResolutionOutcome } from '../src/modules/admin/dto/resolve-dispute.dto';
 import * as argon2 from 'argon2';
+import * as jwt from 'jsonwebtoken';
 
 describe('AdminService', () => {
   let service: AdminService;
-  let prismaService: PrismaService;
-  let contractsService: ContractsService;
 
   const mockPrismaService = {
     admin: {
@@ -33,6 +32,12 @@ describe('AdminService', () => {
   };
 
   beforeEach(async () => {
+    process.env.JWT_SECRET = 'test-secret';
+    process.env.ADMIN_IDLE_TIMEOUT_MS = String(30 * 60 * 1000);
+    process.env.ADMIN_SESSION_MAX_MS = String(8 * 60 * 60 * 1000);
+    process.env.ADMIN_MAX_FAILED_ATTEMPTS = '5';
+    process.env.ADMIN_LOCKOUT_MS = String(15 * 60 * 1000);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdminService,
@@ -52,10 +57,6 @@ describe('AdminService', () => {
     }).compile();
 
     service = module.get<AdminService>(AdminService);
-    prismaService = module.get<PrismaService>(PrismaService);
-    contractsService = module.get<ContractsService>(ContractsService);
-
-    // Clear all mocks before each test
     jest.clearAllMocks();
   });
 
@@ -69,6 +70,8 @@ describe('AdminService', () => {
         walletAddress: '0x123',
         createdAt: new Date(),
         lastLoginAt: null,
+        failedLoginAttempts: 0,
+        lockedUntil: null,
       };
 
       mockPrismaService.admin.findUnique.mockResolvedValue(mockAdmin);
@@ -81,21 +84,84 @@ describe('AdminService', () => {
 
       expect(result).toHaveProperty('token');
       expect(result.admin.email).toBe('admin@test.com');
-      expect(mockPrismaService.admin.update).toHaveBeenCalled();
+      expect(mockPrismaService.admin.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            failedLoginAttempts: 0,
+            lockedUntil: null,
+          }),
+        }),
+      );
     });
 
-    it('should reject login with incorrect password', async () => {
+    it('should reject login with incorrect password and increment attempts', async () => {
       const mockAdmin = {
         adminId: 1,
         email: 'admin@test.com',
         passwordHash: await argon2.hash('password123'),
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+      };
+
+      mockPrismaService.admin.findUnique.mockResolvedValue(mockAdmin);
+      mockPrismaService.admin.update.mockResolvedValue({
+        ...mockAdmin,
+        failedLoginAttempts: 1,
+      });
+
+      await expect(
+        service.login('admin@test.com', 'wrongpassword'),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(mockPrismaService.admin.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ failedLoginAttempts: 1 }),
+        }),
+      );
+    });
+
+    it('should lock account after max failed attempts', async () => {
+      const mockAdmin = {
+        adminId: 1,
+        email: 'admin@test.com',
+        passwordHash: await argon2.hash('password123'),
+        failedLoginAttempts: 4,
+        lockedUntil: null,
+      };
+
+      mockPrismaService.admin.findUnique.mockResolvedValue(mockAdmin);
+      mockPrismaService.admin.update.mockResolvedValue({});
+
+      await expect(
+        service.login('admin@test.com', 'wrongpassword'),
+      ).rejects.toThrow(/locked/i);
+
+      expect(mockPrismaService.admin.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            failedLoginAttempts: 5,
+            lockedUntil: expect.any(Date),
+          }),
+        }),
+      );
+    });
+
+    it('should reject login while account is locked', async () => {
+      const mockAdmin = {
+        adminId: 1,
+        email: 'admin@test.com',
+        passwordHash: await argon2.hash('password123'),
+        failedLoginAttempts: 5,
+        lockedUntil: new Date(Date.now() + 10 * 60 * 1000),
       };
 
       mockPrismaService.admin.findUnique.mockResolvedValue(mockAdmin);
 
       await expect(
-        service.login('admin@test.com', 'wrongpassword'),
-      ).rejects.toThrow(UnauthorizedException);
+        service.login('admin@test.com', 'password123'),
+      ).rejects.toThrow(/locked/i);
+
+      expect(mockPrismaService.admin.update).not.toHaveBeenCalled();
     });
 
     it('should reject login for non-existent admin', async () => {
@@ -104,6 +170,58 @@ describe('AdminService', () => {
       await expect(
         service.login('nonexistent@test.com', 'password123'),
       ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('verifyAndRefreshToken', () => {
+    it('should refresh an active session token', async () => {
+      const now = Date.now();
+      const token = jwt.sign(
+        {
+          adminId: 1,
+          email: 'admin@test.com',
+          walletAddress: '0x123',
+          lastActivity: now - 60_000,
+          sessionStartedAt: now - 120_000,
+        },
+        'test-secret',
+        { expiresIn: '8h' },
+      );
+
+      mockPrismaService.admin.findUnique.mockResolvedValue({
+        adminId: 1,
+        name: 'Test Admin',
+        email: 'admin@test.com',
+        walletAddress: '0x123',
+        lockedUntil: null,
+      });
+
+      const result = await service.verifyAndRefreshToken(token);
+
+      expect(result.admin.email).toBe('admin@test.com');
+      expect(result.token).toBeDefined();
+      const decoded = jwt.verify(result.token, 'test-secret') as any;
+      expect(decoded.lastActivity).toBeGreaterThan(now - 60_000);
+      expect(decoded.sessionStartedAt).toBe(now - 120_000);
+    });
+
+    it('should reject idle sessions', async () => {
+      const now = Date.now();
+      const token = jwt.sign(
+        {
+          adminId: 1,
+          email: 'admin@test.com',
+          walletAddress: '0x123',
+          lastActivity: now - 31 * 60 * 1000,
+          sessionStartedAt: now - 60 * 60 * 1000,
+        },
+        'test-secret',
+        { expiresIn: '8h' },
+      );
+
+      await expect(service.verifyAndRefreshToken(token)).rejects.toThrow(
+        /inactivity/i,
+      );
     });
   });
 
@@ -152,9 +270,7 @@ describe('AdminService', () => {
 
       mockPrismaService.admin.findUnique.mockResolvedValue(mockAdmin);
       mockPrismaService.deal.findUnique.mockResolvedValue(mockDeal);
-      mockContractsService.resolveDisputeOnChain.mockResolvedValue(
-        '0xtxhash',
-      );
+      mockContractsService.resolveDisputeOnChain.mockResolvedValue('0xtxhash');
       mockPrismaService.dealActionLog.create.mockResolvedValue({});
 
       const result = await service.resolveDispute(
@@ -172,18 +288,14 @@ describe('AdminService', () => {
     });
 
     it('should reject resolution for non-disputed deal', async () => {
-      const mockAdmin = {
+      mockPrismaService.admin.findUnique.mockResolvedValue({
         adminId: 1,
         email: 'admin@test.com',
-      };
-
-      const mockDeal = {
+      });
+      mockPrismaService.deal.findUnique.mockResolvedValue({
         dealId: 1,
-        status: 'Released', // Not disputed
-      };
-
-      mockPrismaService.admin.findUnique.mockResolvedValue(mockAdmin);
-      mockPrismaService.deal.findUnique.mockResolvedValue(mockDeal);
+        status: 'Released',
+      });
 
       await expect(
         service.resolveDispute(1, 1, ResolutionOutcome.DRIVER_FRAUD),

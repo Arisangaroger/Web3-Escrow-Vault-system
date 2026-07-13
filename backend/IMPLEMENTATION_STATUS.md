@@ -35,7 +35,7 @@ npm test
 npm run start:dev
 ```
 
-**Admin arbitration:** set `ADMIN_PRIVATE_KEY` to a key that holds Escrow `ADMIN_ROLE`, or grant that role to the treasury/relay address used at deploy.
+**Admin arbitration:** `resolveDispute` is signed by `TREASURY_PRIVATE_KEY` (relay). That address must hold Escrow `ADMIN_ROLE` (local deploy defaults deployer → admin).
 
 ## Known production gaps (deferred)
 

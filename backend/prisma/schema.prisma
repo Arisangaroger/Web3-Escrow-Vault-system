@@ -105,14 +105,17 @@ model SyncState {
 }
 
 model Admin {
-  adminId       Int       @id @default(autoincrement()) @map("admin_id")
-  name          String
-  email         String    @unique
-  passwordHash  String    @map("password_hash")
-  walletAddress String    @map("wallet_address")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  lastLoginAt   DateTime? @map("last_login_at")
-  
+  adminId             Int       @id @default(autoincrement()) @map("admin_id")
+  name                String
+  email               String    @unique
+  passwordHash        String    @map("password_hash")
+  /// On-chain address expected to hold ADMIN_ROLE (usually the relay/deployer).
+  walletAddress       String    @map("wallet_address")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  lastLoginAt         DateTime? @map("last_login_at")
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until")
+
   @@index([email])
   @@map("admins")
 }

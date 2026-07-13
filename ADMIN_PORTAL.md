@@ -164,27 +164,25 @@ The system uses **different transaction patterns** for users and admins:
 ### Admin Wallet Configuration
 
 ```env
-# Relay wallet for user meta-transactions
+# Relay/treasury wallet — pays user meta-tx gas AND signs resolveDispute.
+# On deploy, this address (or ADMIN_ADDRESS) receives Escrow ADMIN_ROLE.
 TREASURY_PRIVATE_KEY="0xRELAY_WALLET_KEY"
-
-# Admin wallet for dispute resolution (must have ADMIN_ROLE on-chain)
-ADMIN_PRIVATE_KEY="0xADMIN_WALLET_KEY"
 ```
 
-**Critical:** The admin wallet address must be granted `ADMIN_ROLE` on the Escrow contract:
+**Prototype setup:** use the same key that deployed Escrow (or was set as `ADMIN_ADDRESS` at deploy). No separate `ADMIN_PRIVATE_KEY` is required.
+
+**Critical:** `TREASURY_PRIVATE_KEY`'s address must hold `ADMIN_ROLE` on Escrow:
 
 ```bash
-# Grant role (run once during setup)
+# If you used a non-deployer admin address, grant role once:
 npx hardhat run scripts/grant-admin-role.js --network amoy
 ```
 
-**See:** `ADMIN_META_TRANSACTION_EXPLANATION.md` for detailed technical explanation.
+**See:** `ADMIN_META_TRANSACTION_EXPLANATION.md` for background; current code resolves disputes via the relay wallet.
 
 ---
 
 ## Database Schema
-
-### Admins Table
 
 ### Admins Table
 ```sql
@@ -193,9 +191,11 @@ CREATE TABLE admins (
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
-  wallet_address VARCHAR(42) NOT NULL,
+  wallet_address VARCHAR(42) NOT NULL, -- expected ADMIN_ROLE / relay address
   created_at TIMESTAMP DEFAULT NOW(),
-  last_login_at TIMESTAMP
+  last_login_at TIMESTAMP,
+  failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+  locked_until TIMESTAMP
 );
 ```
 
@@ -305,7 +305,9 @@ Portal will be available at: `http://localhost:5000`
 - Passwords hashed with Argon2id (same as user PINs)
 - JWT tokens with 8-hour expiration
 - HTTP-only cookies prevent XSS attacks
-- Rate limiting recommended for login endpoint (future enhancement)
+- Rate limiting (IP) plus **account lockout** after 5 failed passwords (15 min)
+- Idle session expiry: JWT refreshed on each request; logout after **30 min inactivity** (8h absolute max)
+- On-chain `resolveDispute` is signed by the **relay/treasury wallet** (deployer ADMIN_ROLE — not a separate admin key)
 
 ### Authorization
 - All admin routes protected by AdminAuthGuard

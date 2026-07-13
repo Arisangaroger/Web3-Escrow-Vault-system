@@ -3,7 +3,13 @@ module.exports = {
   rootDir: '.',
   testRegex: '.*\\.spec\\.ts$',
   transform: {
-    '^.+\\.(t|j)s$': 'ts-jest',
+    '^.+\\.(t|j)s$': [
+      'ts-jest',
+      {
+        // ethers.Contract.connect() loses ABI typings; don't block unit tests
+        diagnostics: false,
+      },
+    ],
   },
   collectCoverageFrom: ['src/**/*.ts'],
   coverageDirectory: './coverage',

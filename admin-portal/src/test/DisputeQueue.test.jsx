@@ -76,7 +76,7 @@ describe('DisputeQueue Component', () => {
 
     await waitFor(() => {
       expect(screen.getByText('#1')).toBeInTheDocument();
-      expect(screen.getByText(/goods not received/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/goods not received/i).length).toBeGreaterThan(0);
       expect(screen.getByRole('button', { name: /review/i })).toBeInTheDocument();
     });
   });

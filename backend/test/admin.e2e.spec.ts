@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
+import * as cookieParser from 'cookie-parser';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/modules/db/prisma.service';
 import * as argon2 from 'argon2';
@@ -16,6 +17,7 @@ describe('Admin Portal E2E Tests', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(cookieParser());
     app.useGlobalPipes(new ValidationPipe());
     await app.init();
 
@@ -85,26 +87,38 @@ describe('Admin Portal E2E Tests', () => {
         .expect(400);
     });
 
-    it('POST /admin/login - should rate limit after 5 attempts', async () => {
-      const promises = [];
-      
-      // Make 6 login attempts
-      for (let i = 0; i < 6; i++) {
-        promises.push(
-          request(app.getHttpServer())
-            .post('/admin/login')
-            .send({
-              email: 'test@admin.com',
-              password: 'wrong',
-            })
-        );
+    it('POST /admin/login - should lock account after 5 failed attempts', async () => {
+      let lastBody: any;
+
+      for (let i = 0; i < 5; i++) {
+        const response = await request(app.getHttpServer())
+          .post('/admin/login')
+          .send({
+            email: 'test@admin.com',
+            password: 'wrongpassword',
+          });
+        lastBody = response.body;
       }
 
-      const responses = await Promise.all(promises);
-      
-      // Last request should be rate limited
-      const lastResponse = responses[5];
-      expect(lastResponse.status).toBe(429); // Too Many Requests
+      expect(lastBody.success).toBe(false);
+      expect(lastBody.error).toMatch(/locked/i);
+
+      // Even correct password should fail while locked
+      const lockedLogin = await request(app.getHttpServer())
+        .post('/admin/login')
+        .send({
+          email: 'test@admin.com',
+          password: 'testpassword123',
+        });
+
+      expect(lockedLogin.body.success).toBe(false);
+      expect(lockedLogin.body.error).toMatch(/locked/i);
+
+      // Clear lock for subsequent tests
+      await prisma.admin.update({
+        where: { email: 'test@admin.com' },
+        data: { failedLoginAttempts: 0, lockedUntil: null },
+      });
     });
   });
 

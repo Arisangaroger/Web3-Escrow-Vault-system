@@ -12,7 +12,6 @@ export class ContractsService {
   private readonly escrowContract: ethers.Contract;
   private readonly eRWFContract: ethers.Contract;
   private readonly chainId: number;
-  private readonly adminWallet: ethers.Wallet;
 
   constructor(
     private configService: ConfigService,
@@ -37,15 +36,14 @@ export class ContractsService {
     this.escrowContract = new ethers.Contract(escrowAddress, escrowAbi, provider);
     this.eRWFContract = new ethers.Contract(eRWFAddress, eRWFAbi, provider);
 
-    // Admin for resolveDispute (must hold ADMIN_ROLE on Escrow). Defaults to treasury/relay.
-    const adminKey =
-      this.configService.get<string>('ADMIN_PRIVATE_KEY') ||
-      this.configService.get<string>('TREASURY_PRIVATE_KEY');
-    this.adminWallet = new ethers.Wallet(adminKey, provider);
-
+    // Dispute resolution uses the relay/treasury wallet. On deploy, that address
+    // (or ADMIN_ADDRESS) receives ADMIN_ROLE — no separate admin key needed.
     this.logger.log(`Escrow contract: ${escrowAddress}`);
     this.logger.log(`eRWF contract: ${eRWFAddress}`);
     this.logger.log(`Chain ID: ${this.chainId}`);
+    this.logger.log(
+      `ResolveDispute signer (relay): ${this.gasRelayService.getTreasuryWallet().address}`,
+    );
   }
 
   /**
@@ -276,7 +274,8 @@ export class ContractsService {
   }
 
   /**
-   * Resolve dispute — caller must hold ADMIN_ROLE (ADMIN_PRIVATE_KEY or treasury)
+   * Resolve dispute — signed by relay/treasury wallet (must hold ADMIN_ROLE).
+   * Matches local deploy: deployer/adminAddress defaults to ADMIN_ROLE holder.
    */
   async resolveDisputeOnChain(
     dealId: number,
@@ -286,13 +285,16 @@ export class ContractsService {
     try {
       const amountToSenderWei = ethers.parseEther(amountToSender);
       const amountToReceiverWei = ethers.parseEther(amountToReceiver);
+      const relayWallet = this.gasRelayService.getTreasuryWallet();
 
       const tx = await this.escrowContract
-        .connect(this.adminWallet)
+        .connect(relayWallet)
         .resolveDispute(dealId, amountToSenderWei, amountToReceiverWei);
       const receipt = await tx.wait();
 
-      this.logger.log(`Dispute resolved for deal ${dealId}: ${receipt.hash}`);
+      this.logger.log(
+        `Dispute resolved for deal ${dealId} by relay ${relayWallet.address}: ${receipt.hash}`,
+      );
       return receipt.hash;
     } catch (error) {
       throw new Error(this.formatContractError('resolveDispute', error));

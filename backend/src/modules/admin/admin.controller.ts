@@ -27,11 +27,11 @@ export class AdminController {
   /**
    * Admin login
    * POST /admin/login
-   * Rate limited: 5 attempts per 15 minutes
+   * Rate limited (IP) + account lockout after N failed attempts
    */
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 5, ttl: 900000 } }) // 5 attempts per 15 min
+  @Throttle({ default: { limit: 10, ttl: 900000 } }) // IP throttle; lockout is per-account
   async login(
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
@@ -39,13 +39,7 @@ export class AdminController {
     try {
       const result = await this.adminService.login(dto.email, dto.password);
 
-      // Set HTTP-only cookie
-      res.cookie('admin_token', result.token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 8 * 60 * 60 * 1000, // 8 hours
-      });
+      res.cookie('admin_token', result.token, this.adminService.getCookieOptions());
 
       return {
         success: true,
@@ -112,6 +106,29 @@ export class AdminController {
   }
 
   /**
+   * Get resolved disputes history
+   * GET /admin/disputes/history
+   * Must be registered before :dealId or "history" is captured as an id.
+   */
+  @Get('disputes/history')
+  @UseGuards(AdminAuthGuard)
+  async getHistory() {
+    try {
+      const history = await this.adminService.getResolvedDisputes();
+      return {
+        success: true,
+        data: history,
+      };
+    } catch (error) {
+      this.logger.error(`Get history failed: ${error.message}`);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
    * Get dispute detail with timeline
    * GET /admin/disputes/:dealId
    */
@@ -158,28 +175,6 @@ export class AdminController {
       };
     } catch (error) {
       this.logger.error(`Resolve dispute failed: ${error.message}`);
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-  }
-
-  /**
-   * Get resolved disputes history
-   * GET /admin/disputes/history
-   */
-  @Get('disputes/history')
-  @UseGuards(AdminAuthGuard)
-  async getHistory() {
-    try {
-      const history = await this.adminService.getResolvedDisputes();
-      return {
-        success: true,
-        data: history,
-      };
-    } catch (error) {
-      this.logger.error(`Get history failed: ${error.message}`);
       return {
         success: false,
         error: error.message,

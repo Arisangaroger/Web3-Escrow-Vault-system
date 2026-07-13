@@ -6,11 +6,27 @@ import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
 import { ResolutionOutcome } from './dto/resolve-dispute.dto';
 
+export type AdminSessionPayload = {
+  adminId: number;
+  email: string;
+  walletAddress: string;
+  lastActivity: number;
+  sessionStartedAt: number;
+};
+
 @Injectable()
 export class AdminService {
   private readonly logger = new Logger(AdminService.name);
   private readonly jwtSecret = process.env.JWT_SECRET || 'change-me-in-production';
-  private readonly jwtExpiresIn = process.env.JWT_EXPIRES_IN || '8h';
+  /** Absolute session ceiling (hard max). */
+  private readonly jwtExpiresIn: jwt.SignOptions['expiresIn'] =
+    (process.env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn']) || '8h';
+  private readonly absoluteSessionMs = Number(process.env.ADMIN_SESSION_MAX_MS) || 8 * 60 * 60 * 1000;
+  /** Idle timeout — refreshed on each authenticated request. */
+  private readonly idleTimeoutMs =
+    Number(process.env.ADMIN_IDLE_TIMEOUT_MS) || 30 * 60 * 1000;
+  private readonly maxFailedAttempts = Number(process.env.ADMIN_MAX_FAILED_ATTEMPTS) || 5;
+  private readonly lockoutMs = Number(process.env.ADMIN_LOCKOUT_MS) || 15 * 60 * 1000;
 
   constructor(
     private prisma: PrismaService,
@@ -18,11 +34,24 @@ export class AdminService {
     private contractsService: ContractsService,
   ) {}
 
+  getCookieMaxAgeMs(): number {
+    return this.absoluteSessionMs;
+  }
+
+  getCookieOptions() {
+    return {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict' as const,
+      maxAge: this.absoluteSessionMs,
+    };
+  }
+
   /**
-   * Admin login with email and password
+   * Admin login with email and password.
+   * Account is locked after N consecutive failures for LOCKOUT_MS.
    */
   async login(email: string, password: string): Promise<{ token: string; admin: any }> {
-    // Find admin by email
     const admin = await this.prisma.admin.findUnique({
       where: { email },
     });
@@ -31,29 +60,60 @@ export class AdminService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Verify password
+    if (admin.lockedUntil && admin.lockedUntil.getTime() > Date.now()) {
+      const minutesLeft = Math.ceil(
+        (admin.lockedUntil.getTime() - Date.now()) / 60000,
+      );
+      throw new UnauthorizedException(
+        `Account locked due to too many failed logins. Try again in ${minutesLeft} minute(s).`,
+      );
+    }
+
     const isValidPassword = await argon2.verify(admin.passwordHash, password);
 
     if (!isValidPassword) {
+      const attempts = admin.failedLoginAttempts + 1;
+      const lockData =
+        attempts >= this.maxFailedAttempts
+          ? {
+              failedLoginAttempts: attempts,
+              lockedUntil: new Date(Date.now() + this.lockoutMs),
+            }
+          : { failedLoginAttempts: attempts, lockedUntil: null };
+
+      await this.prisma.admin.update({
+        where: { adminId: admin.adminId },
+        data: lockData,
+      });
+
+      if (attempts >= this.maxFailedAttempts) {
+        const minutes = Math.ceil(this.lockoutMs / 60000);
+        throw new UnauthorizedException(
+          `Account locked due to too many failed logins. Try again in ${minutes} minute(s).`,
+        );
+      }
+
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Update last login
+    // Successful login — clear lockout counters
     await this.prisma.admin.update({
       where: { adminId: admin.adminId },
-      data: { lastLoginAt: new Date() },
+      data: {
+        lastLoginAt: new Date(),
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+      },
     });
 
-    // Generate JWT token
-    const token = jwt.sign(
-      {
-        adminId: admin.adminId,
-        email: admin.email,
-        walletAddress: admin.walletAddress,
-      },
-      this.jwtSecret,
-      { expiresIn: this.jwtExpiresIn },
-    );
+    const now = Date.now();
+    const token = this.signSession({
+      adminId: admin.adminId,
+      email: admin.email,
+      walletAddress: admin.walletAddress,
+      lastActivity: now,
+      sessionStartedAt: now,
+    });
 
     return {
       token,
@@ -67,29 +127,82 @@ export class AdminService {
   }
 
   /**
-   * Verify JWT token and return admin info
+   * Verify JWT, enforce idle + absolute session limits, and issue a refreshed token.
    */
-  async verifyToken(token: string): Promise<any> {
+  async verifyAndRefreshToken(
+    token: string,
+  ): Promise<{ admin: any; token: string }> {
+    let decoded: AdminSessionPayload;
+
     try {
-      const decoded = jwt.verify(token, this.jwtSecret) as any;
+      decoded = jwt.verify(token, this.jwtSecret) as AdminSessionPayload;
+    } catch {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
 
-      const admin = await this.prisma.admin.findUnique({
-        where: { adminId: decoded.adminId },
-      });
+    const now = Date.now();
 
-      if (!admin) {
-        throw new UnauthorizedException('Admin not found');
-      }
+    if (
+      !decoded.lastActivity ||
+      now - decoded.lastActivity > this.idleTimeoutMs
+    ) {
+      throw new UnauthorizedException(
+        'Session expired due to inactivity. Please log in again.',
+      );
+    }
 
-      return {
+    if (
+      !decoded.sessionStartedAt ||
+      now - decoded.sessionStartedAt > this.absoluteSessionMs
+    ) {
+      throw new UnauthorizedException(
+        'Session expired. Please log in again.',
+      );
+    }
+
+    const admin = await this.prisma.admin.findUnique({
+      where: { adminId: decoded.adminId },
+    });
+
+    if (!admin) {
+      throw new UnauthorizedException('Admin not found');
+    }
+
+    if (admin.lockedUntil && admin.lockedUntil.getTime() > now) {
+      throw new UnauthorizedException('Account is locked');
+    }
+
+    const refreshedToken = this.signSession({
+      adminId: admin.adminId,
+      email: admin.email,
+      walletAddress: admin.walletAddress,
+      lastActivity: now,
+      sessionStartedAt: decoded.sessionStartedAt,
+    });
+
+    return {
+      token: refreshedToken,
+      admin: {
         adminId: admin.adminId,
         name: admin.name,
         email: admin.email,
         walletAddress: admin.walletAddress,
-      };
-    } catch (error) {
-      throw new UnauthorizedException('Invalid token');
-    }
+      },
+    };
+  }
+
+  /**
+   * Verify JWT token and return admin info (no refresh — prefer verifyAndRefreshToken).
+   */
+  async verifyToken(token: string): Promise<any> {
+    const { admin } = await this.verifyAndRefreshToken(token);
+    return admin;
+  }
+
+  private signSession(payload: AdminSessionPayload): string {
+    return jwt.sign(payload, this.jwtSecret, {
+      expiresIn: this.jwtExpiresIn,
+    });
   }
 
   /**
@@ -162,7 +275,7 @@ export class AdminService {
       timeline: deal.actionLogs.map((log) => ({
         action: log.action,
         actorPhone: log.actorPhone,
-        actorName: log.actor.phoneNumber, // Could enhance with names if stored
+        actorName: log.actor.phoneNumber,
         timestamp: log.timestamp,
         txHash: log.txHash,
       })),
@@ -175,15 +288,13 @@ export class AdminService {
   }
 
   /**
-   * Resolve a dispute with admin decision
-   * Uses relay wallet pattern: admin signs, relay submits
+   * Resolve a dispute — on-chain tx is signed by the relay wallet (ADMIN_ROLE holder).
    */
   async resolveDispute(
     adminId: number,
     dealId: number,
     outcome: ResolutionOutcome,
   ): Promise<{ txHash: string }> {
-    // Get admin info
     const admin = await this.prisma.admin.findUnique({
       where: { adminId },
     });
@@ -192,7 +303,6 @@ export class AdminService {
       throw new UnauthorizedException('Admin not found');
     }
 
-    // Get deal info
     const deal = await this.prisma.deal.findUnique({
       where: { dealId },
     });
@@ -205,7 +315,6 @@ export class AdminService {
       throw new BadRequestException('Deal is not in disputed status');
     }
 
-    // Calculate resolution amounts based on outcome
     const amount = deal.amount.toString();
     let amountToSender = '0';
     let amountToReceiver = '0';
@@ -213,13 +322,11 @@ export class AdminService {
     switch (outcome) {
       case ResolutionOutcome.DRIVER_FRAUD:
       case ResolutionOutcome.FAULTY_GOODS:
-        // Refund buyer (receiver)
         amountToReceiver = amount;
         amountToSender = '0';
         break;
 
       case ResolutionOutcome.FALSE_BUYER_CLAIM:
-        // Pay farmer (sender)
         amountToSender = amount;
         amountToReceiver = '0';
         break;
@@ -229,21 +336,17 @@ export class AdminService {
       `Resolving dispute ${dealId}: ${outcome} - Sender: ${amountToSender}, Receiver: ${amountToReceiver}`,
     );
 
-    // Execute resolution on-chain using relay wallet pattern
-    // Note: resolveDispute doesn't use meta-transactions (no signature param)
-    // It uses direct role-based access control (onlyRole(ADMIN_ROLE))
-    // The relay wallet submits the transaction, but it must have ADMIN_ROLE
+    // On-chain: onlyRole(ADMIN_ROLE). Relay/treasury wallet (deployer) holds that role.
     const txHash = await this.contractsService.resolveDisputeOnChain(
       dealId,
       amountToSender,
       amountToReceiver,
     );
 
-    // Log admin action for audit trail
     await this.prisma.dealActionLog.create({
       data: {
         dealId,
-        actorPhone: admin.email, // Use email as identifier for admin
+        actorPhone: admin.email,
         action: `AdminResolution_${outcome}`,
         timestamp: new Date(),
         txHash,
@@ -262,7 +365,7 @@ export class AdminService {
     const deals = await this.prisma.deal.findMany({
       where: {
         status: { in: ['Released', 'Resolved'] },
-        disputeReasonCode: { not: null }, // Only deals that were disputed
+        disputeReasonCode: { not: null },
       },
       include: {
         sender: true,
@@ -290,15 +393,13 @@ export class AdminService {
       disputeReasonCode: deal.disputeReasonCode,
       disputeReasonText: this.getDisputeReasonText(deal.disputeReasonCode),
       resolvedBy: deal.actionLogs[0]?.actorPhone || 'Unknown',
-      resolutionOutcome: deal.actionLogs[0]?.action.replace('AdminResolution_', '') || 'Unknown',
+      resolutionOutcome:
+        deal.actionLogs[0]?.action.replace('AdminResolution_', '') || 'Unknown',
       resolvedAt: deal.actionLogs[0]?.timestamp,
       status: deal.status,
     }));
   }
 
-  /**
-   * Helper: Map dispute reason code to text
-   */
   private getDisputeReasonText(code: number | null): string {
     const reasons = {
       1: 'Goods not received',

@@ -12,8 +12,8 @@ export class AdminAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
+    const response = context.switchToHttp().getResponse();
 
-    // Extract token from cookie or Authorization header
     const token =
       request.cookies?.admin_token ||
       request.headers.authorization?.replace('Bearer ', '');
@@ -23,11 +23,24 @@ export class AdminAuthGuard implements CanActivate {
     }
 
     try {
-      const admin = await this.adminService.verifyToken(token);
+      const { admin, token: refreshedToken } =
+        await this.adminService.verifyAndRefreshToken(token);
+
       request.admin = admin;
+
+      // Slide idle window: reissue cookie with updated lastActivity claim
+      response.cookie(
+        'admin_token',
+        refreshedToken,
+        this.adminService.getCookieOptions(),
+      );
+
       return true;
     } catch (error) {
-      throw new UnauthorizedException('Invalid or expired token');
+      response.clearCookie('admin_token');
+      throw new UnauthorizedException(
+        error?.message || 'Invalid or expired token',
+      );
     }
   }
 }
