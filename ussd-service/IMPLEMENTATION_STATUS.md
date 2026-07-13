@@ -9,7 +9,7 @@
 
 ### 2. Session Management (Section 4)
 - [x] SessionStore class with in-memory storage
-- [x] Automatic timeout enforcement (30 seconds default)
+- [x] Automatic timeout enforcement (90 seconds default - allows phone number entry)
 - [x] Periodic cleanup of expired sessions
 - [x] Session context tracking (current node, selections, timestamps)
 

@@ -3,7 +3,7 @@ const { isValidPin } = require('../../utils/validators');
 const { getDisputeReasonText } = require('../../utils/menuHelpers');
 
 /**
- * PIN entry for dispute/revoke action
+ * PIN entry for dispute/revoke — verify PIN then async submit
  */
 class EnterDisputePinNode extends MenuNode {
   constructor() {
@@ -29,40 +29,39 @@ class EnterDisputePinNode extends MenuNode {
     const phoneNumber = session.phoneNumber;
 
     try {
-      const result = await backendClient.revokeDeal(phoneNumber, dealId, reasonCode, pin);
-
-      if (result.success) {
-        // Clear context
-        sessionStore.clearContext(session.sessionId);
-
-        const reasonText = getDisputeReasonText(reasonCode);
-
-        return {
-          nextNode: null,
-          message: this.end(
-            `Dispute filed successfully!\n` +
-            `Reason: ${reasonText}\n` +
-            `All parties and admin notified.\n` +
-            `Deal frozen pending review.`
-          ),
-        };
-      } else {
-        const errorMsg = result.error || 'Dispute failed';
-
-        // Check for PIN errors
-        if (errorMsg.includes('PIN') || errorMsg.includes('locked')) {
-          return {
-            nextNode: 'ENTER_DISPUTE_PIN',
-            message: this.con(`${errorMsg}\nEnter PIN:`),
-          };
+      const verified = await backendClient.verifyPin(phoneNumber, pin);
+      if (!verified.success) {
+        const errorMsg = verified.error || 'Incorrect PIN';
+        if (errorMsg.toLowerCase().includes('locked')) {
+          return { nextNode: null, message: this.end(errorMsg) };
         }
-
-        // Other errors
         return {
-          nextNode: null,
-          message: this.end(`Error: ${errorMsg}`),
+          nextNode: 'ENTER_DISPUTE_PIN',
+          message: this.con(`${errorMsg}\nEnter PIN:`),
         };
       }
+
+      const reasonText = getDisputeReasonText(reasonCode);
+
+      backendClient
+        .revokeDeal(phoneNumber, dealId, reasonCode, pin)
+        .then((result) => {
+          if (!result?.success) {
+            console.error('Background revoke failed:', result?.error || result);
+          }
+        })
+        .catch((error) => {
+          console.error('Background revoke error:', error.message);
+        });
+
+      sessionStore.clearContext(session.sessionId);
+
+      return {
+        nextNode: null,
+        message: this.end(
+          `Dispute submitted.\nReason: ${reasonText}\nProcessing...\nYou will receive SMS when complete.`
+        ),
+      };
     } catch (error) {
       console.error('Dispute error:', error.message);
       return {

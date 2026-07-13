@@ -2,8 +2,9 @@ const MenuNode = require('../MenuNode');
 const { isValidPin } = require('../../utils/validators');
 
 /**
- * PIN entry for action execution
- * This node executes the pending action with the backend
+ * PIN entry for action execution.
+ * Verifies PIN synchronously, then fire-and-forgets the chain action so USSD
+ * can return END Processing… within session timeout.
  */
 class EnterPinNode extends MenuNode {
   constructor() {
@@ -29,26 +30,35 @@ class EnterPinNode extends MenuNode {
     const phoneNumber = session.phoneNumber;
 
     try {
-      let result;
+      const verified = await backendClient.verifyPin(phoneNumber, pin);
+      if (!verified.success) {
+        const errorMsg = verified.error || 'Incorrect PIN';
+        if (errorMsg.toLowerCase().includes('locked')) {
+          return {
+            nextNode: null,
+            message: this.end(errorMsg),
+          };
+        }
+        return {
+          nextNode: 'ENTER_PIN',
+          message: this.con(`${errorMsg}\nEnter PIN:`),
+        };
+      }
 
-      // Execute action via backend API
+      let actionCall;
       switch (action) {
         case 'LOCK_FUNDS':
-          result = await backendClient.lockFunds(phoneNumber, dealId, pin);
+          actionCall = backendClient.lockFunds(phoneNumber, dealId, pin);
           break;
-
         case 'MARK_SHIPPED':
-          result = await backendClient.markShipped(phoneNumber, dealId, pin);
+          actionCall = backendClient.markShipped(phoneNumber, dealId, pin);
           break;
-
         case 'MARK_DELIVERED':
-          result = await backendClient.markDelivered(phoneNumber, dealId, pin);
+          actionCall = backendClient.markDelivered(phoneNumber, dealId, pin);
           break;
-
         case 'CANCEL':
-          result = await backendClient.cancelDeal(phoneNumber, dealId, pin);
+          actionCall = backendClient.cancelDeal(phoneNumber, dealId, pin);
           break;
-
         default:
           return {
             nextNode: 'DEAL_ACTIONS',
@@ -56,44 +66,26 @@ class EnterPinNode extends MenuNode {
           };
       }
 
-      // Handle response
-      if (result.success) {
-        // Clear context
-        sessionStore.clearContext(session.sessionId);
+      actionCall
+        .then((result) => {
+          if (!result?.success) {
+            console.error(`Background ${action} failed:`, result?.error || result);
+          }
+        })
+        .catch((error) => {
+          console.error(`Background ${action} error:`, error.message);
+        });
 
-        const successMessages = {
-          LOCK_FUNDS: 'Funds locked successfully!\nYou will receive SMS confirmation shortly.',
-          MARK_SHIPPED: 'Marked as shipped!\nDriver and receiver notified via SMS.',
-          MARK_DELIVERED: 'Marked as delivered!\nAll parties notified. 3-hour dispute window started.',
-          CANCEL: 'Deal cancelled successfully.',
-        };
+      sessionStore.clearContext(session.sessionId);
 
-        return {
-          nextNode: null,
-          message: this.end(successMessages[action] || 'Action completed.'),
-        };
-      } else {
-        // Handle specific errors
-        const errorMsg = result.error || 'Action failed';
-
-        // Check for PIN-related errors
-        if (errorMsg.includes('PIN') || errorMsg.includes('locked')) {
-          return {
-            nextNode: 'ENTER_PIN',
-            message: this.con(`${errorMsg}\nEnter PIN:`),
-          };
-        }
-
-        // Other errors - end session
-        return {
-          nextNode: null,
-          message: this.end(`Error: ${errorMsg}`),
-        };
-      }
+      return {
+        nextNode: null,
+        message: this.end(
+          'Processing request...\nYou will receive an SMS when complete.'
+        ),
+      };
     } catch (error) {
       console.error('Action execution error:', error.message);
-
-      // Network/system error
       return {
         nextNode: null,
         message: this.end('System error. Please try again later.'),

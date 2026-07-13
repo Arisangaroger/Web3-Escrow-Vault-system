@@ -103,3 +103,16 @@ model SyncState {
 
   @@map("sync_state")
 }
+
+model Admin {
+  adminId       Int       @id @default(autoincrement()) @map("admin_id")
+  name          String
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  walletAddress String    @map("wallet_address")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  lastLoginAt   DateTime? @map("last_login_at")
+  
+  @@index([email])
+  @@map("admins")
+}

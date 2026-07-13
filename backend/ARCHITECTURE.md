@@ -2,43 +2,51 @@
 
 ## System Overview
 
-The backend serves as the bridge between users (via USSD in Phase 3) and the blockchain. It manages custodial wallets, PIN authentication, transaction signing, and maintains a queryable cache of blockchain state.
+The backend serves as the bridge between users (via USSD in Phase 3 and Admin Portal in Phase 4) and the blockchain. It manages custodial wallets, PIN authentication, transaction signing, and maintains a queryable cache of blockchain state.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         CLIENT LAYER                             │
-│  (Phase 2: HTTP/REST API, Phase 3: USSD Gateway Integration)   │
-└───────────────────────────┬─────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────┐
+│                         CLIENT LAYER                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐  │
+│  │ USSD Gateway │  │ Admin Portal │  │ Direct API               │  │
+│  │ (Phase 3)    │  │ (Phase 4)    │  │ (Testing/Integration)    │  │
+│  └──────────────┘  └──────────────┘  └──────────────────────────┘  │
+└───────────────────────────┬───────────────────────────────────────────┘
                             │
-┌───────────────────────────┴─────────────────────────────────────┐
-│                      API LAYER (NestJS)                          │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
-│  │ ApiController│  │ Validation  │  │ Error       │            │
-│  │             │  │ (DTOs)      │  │ Handling    │            │
-│  └──────┬──────┘  └─────────────┘  └─────────────┘            │
-└─────────┼────────────────────────────────────────────────────────┘
-          │
-┌─────────┴────────────────────────────────────────────────────────┐
-│                    BUSINESS LOGIC LAYER                           │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │ DealsService: Deal lifecycle coordination                │   │
-│  │ - createDeal, lockFunds, markShipped, markDelivered      │   │
-│  │ - revoke, getActiveDeals, etc.                           │   │
-│  └──────────────────────────────────────────────────────────┘   │
-└────────┬──────────────┬──────────────┬─────────────────────────┘
+┌───────────────────────────┴───────────────────────────────────────────┐
+│                      API LAYER (NestJS)                                │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                  │
+│  │ ApiController│  │AdminController│ │ Validation  │ │ Error       │ │
+│  │ (User Deals)│  │ (Disputes)   │ │ (DTOs)      │ │ Handling    │ │
+│  └──────┬──────┘  └──────┬───────┘  └─────────────┘ └─────────────┘ │
+└─────────┼─────────────────┼─────────────────────────────────────────────┘
+          │                 │
+┌─────────┴─────────────────┴───────────────────────────────────────────┐
+│                    BUSINESS LOGIC LAYER                                │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │ DealsService: Deal lifecycle coordination                    │    │
+│  │ - createDeal, lockFunds, markShipped, markDelivered          │    │
+│  │ - revoke, getActiveDeals, etc.                               │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │ AdminService: Dispute resolution (Phase 4)                   │    │
+│  │ - login, getDisputedDeals, getDisputeDetail                  │    │
+│  │ - resolveDispute, getResolvedDisputes                        │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+└────────┬──────────────┬──────────────┬─────────────────────────────────┘
          │              │              │
     ┌────┴───┐    ┌────┴───┐    ┌────┴──────┐
     │ Wallets│    │  Auth  │    │ Contracts │
     │ Service│    │ Service│    │  Service  │
     └────┬───┘    └────┬───┘    └────┬──────┘
          │             │              │
-┌────────┴─────────────┴──────────────┴───────────────────────────┐
-│                    INFRASTRUCTURE LAYER                           │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐│
-│  │  Prisma     │  │  Argon2     │  │  Ethers.js              ││
-│  │  (Database) │  │  (PIN Hash) │  │  (Blockchain)           ││
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘│
-└──────────────────────────────────────────────────────────────────┘
+┌────────┴─────────────┴──────────────┴───────────────────────────────────┐
+│                    INFRASTRUCTURE LAYER                                  │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐        │
+│  │  Prisma     │  │  Argon2     │  │  Ethers.js              │        │
+│  │  (Database) │  │  (PIN Hash) │  │  (Blockchain)           │        │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘        │
+└──────────────────────────────────────────────────────────────────────────┘
          │                                      │
     ┌────┴────┐                          ┌─────┴─────┐
     │PostgreSQL│                          │Polygon RPC│
@@ -256,7 +264,39 @@ This simultaneous alert is the fraud prevention mechanism.
 
 ---
 
-### 9. **KeeperService** (`src/modules/keeper/`)
+### 9. **AdminService** (`src/modules/admin/`) - **Phase 4**
+**Responsibility:** Dispute resolution and admin authentication
+
+**Key Functions:**
+- `login(email, password)` - JWT-based admin authentication
+- `verifyToken(token)` - Validate admin session
+- `getDisputedDeals()` - List all active disputes
+- `getDisputeDetail(dealId)` - Full deal info with timeline
+- `resolveDispute(adminId, dealId, outcome)` - Execute resolution on-chain
+- `getResolvedDisputes()` - Historical dispute view
+
+**Resolution Outcomes:**
+```
+DRIVER_FRAUD      → 100% refund to receiver
+FAULTY_GOODS      → 100% refund to receiver  
+FALSE_BUYER_CLAIM → 100% payment to sender
+```
+
+**Security:**
+- Admin passwords hashed with Argon2 (same as user PINs)
+- JWT tokens with 8-hour expiration
+- HTTP-only cookies prevent XSS
+- AdminAuthGuard protects all routes
+- Admin wallet managed custodially (same pattern as users)
+
+**Audit Trail:**
+- Every resolution logged to `deal_action_log`
+- Includes admin identifier, outcome, transaction hash
+- Immutable blockchain record provides verification
+
+---
+
+### 10. **KeeperService** (`src/modules/keeper/`)
 **Responsibility:** Scheduled automation jobs
 
 **Jobs:**
@@ -357,6 +397,17 @@ users (
   created_at TIMESTAMP
 )
 
+-- Admin accounts (Phase 4)
+admins (
+  admin_id PK
+  name TEXT
+  email TEXT UNIQUE
+  password_hash TEXT          -- argon2id hash
+  wallet_address TEXT         -- Must have ADMIN_ROLE on contract
+  created_at TIMESTAMP
+  last_login_at TIMESTAMP NULL
+)
+
 -- Deal state cache (synced from blockchain)
 deals (
   deal_id PK
@@ -377,8 +428,8 @@ deals (
 deal_action_log (
   id PK
   deal_id FK → deals
-  actor_phone FK → users
-  action TEXT (e.g., "MarkedShipped")
+  actor_phone FK → users  -- OR admin email for admin actions
+  action TEXT (e.g., "MarkedShipped", "AdminResolution_DRIVER_FRAUD")
   timestamp TIMESTAMP
   tx_hash TEXT
 )

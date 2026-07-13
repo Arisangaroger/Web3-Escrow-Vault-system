@@ -10,7 +10,7 @@
 Before building the simulator, it's worth being explicit about the real-world constraints your simulator must faithfully reproduce, since these shape every decision below:
 
 - **Session-based, not connection-based.** A USSD session is a back-and-forth of short requests/responses tied together by a `sessionId`, not a persistent open connection. Each "screen" the user sees is a fresh HTTP request from the telecom gateway to your server, carrying the accumulated input so far.
-- **Short timeouts.** Real USSD sessions typically expire after 20–30 seconds of user inactivity between screens. Your simulator should replicate this so your backend logic (async blockchain calls returning "Processing…" instead of blocking) gets tested realistically rather than assuming unlimited time.
+- **Reasonable timeouts.** Real USSD sessions typically expire after 60-120 seconds of user inactivity between screens. We use 90 seconds to allow time for phone number entry on feature phone keypads.
 - **Text-only, narrow screen.** Real feature phones display very limited characters per screen (often ~182 characters total including the menu). Menus must be concise.
 - **One request/response cycle per screen.** The gateway calls your server with the user's latest input; your server replies with either `CON` (continue session, show another menu) or `END` (terminate session, show final message) — this `CON`/`END` contract is the standard Africa's Talking-style protocol, and matching it now means a real gateway can be substituted later with minimal rework.
 

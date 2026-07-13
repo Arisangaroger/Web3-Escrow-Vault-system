@@ -17,7 +17,7 @@ Phase 3 of the Agricultural Escrow Platform is **100% complete**. The USSD simul
 ### 1. Complete USSD Application Server
 - **14 menu nodes** covering entire user journey
 - **CON/END protocol** matching Africa's Talking standard
-- **Session management** with 30-second timeout
+- **Session management** with 90-second timeout per screen (allows phone number entry)
 - **Input validation** at every screen
 - **Error recovery** with user-friendly messages
 - **Backend integration** via thin API client
@@ -152,7 +152,7 @@ ussd-service/simulator-ui/index.html
 ### Technical Features
 
 ✅ **Session Management**
-- 30-second timeout (configurable)
+- 90-second timeout per screen (configurable) - allows comfortable phone number entry
 - Automatic cleanup
 - Context preservation across screens
 

@@ -263,4 +263,22 @@ export class NotificationsService {
       dealId,
     );
   }
+
+  /**
+   * List recent notifications for a phone (SMS inbox / simulator)
+   */
+  async getNotificationsForPhone(phoneNumber: string, limit = 20) {
+    return this.prisma.notificationLog.findMany({
+      where: { recipientPhone: phoneNumber },
+      orderBy: { sentAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        dealId: true,
+        message: true,
+        sentAt: true,
+        deliveryStatus: true,
+      },
+    });
+  }
 }

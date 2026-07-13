@@ -11,7 +11,7 @@ Every USSD request contains the following parameters:
 ```json
 {
   "sessionId": "string",    // Unique session identifier
-  "phoneNumber": "string",  // User's phone number (E.164 format preferred)
+  "phoneNumber": "string",  // User's phone number (local 07XXXXXXXX preferred)
   "text": "string"          // Accumulated user input, separated by *
 }
 ```
@@ -22,7 +22,7 @@ Every USSD request contains the following parameters:
 ```json
 {
   "sessionId": "ATUid_abc123",
-  "phoneNumber": "+250788123456",
+  "phoneNumber": "0788123456",
   "text": ""
 }
 ```
@@ -31,7 +31,7 @@ Every USSD request contains the following parameters:
 ```json
 {
   "sessionId": "ATUid_abc123",
-  "phoneNumber": "+250788123456",
+  "phoneNumber": "0788123456",
   "text": "1"
 }
 ```
@@ -40,7 +40,7 @@ Every USSD request contains the following parameters:
 ```json
 {
   "sessionId": "ATUid_abc123",
-  "phoneNumber": "+250788123456",
+  "phoneNumber": "0788123456",
   "text": "1*2*3"
 }
 ```
@@ -92,7 +92,7 @@ The last segment (after the final `*`) is the most recent user input.
 
 ### 3. Session Timeout
 
-Sessions expire after inactivity (default: 30 seconds). If a user sends input after expiration:
+Sessions expire after inactivity (default: 90 seconds). If a user sends input after expiration:
 
 ```
 END Session expired. Please dial again.
@@ -129,19 +129,19 @@ CON Main Menu:
 ### Session Flow Example
 
 ```
-Request:  { sessionId: "abc", phoneNumber: "+250788123456", text: "" }
+Request:  { sessionId: "abc", phoneNumber: "0788123456", text: "" }
 Response: CON Main Menu:\n1. My Shipments\n2. My Deliveries
 
-Request:  { sessionId: "abc", phoneNumber: "+250788123456", text: "1" }
+Request:  { sessionId: "abc", phoneNumber: "0788123456", text: "1" }
 Response: CON My Shipments:\n1. Deal #42 (1000 RWF)\n0. Back
 
-Request:  { sessionId: "abc", phoneNumber: "+250788123456", text: "1*1" }
+Request:  { sessionId: "abc", phoneNumber: "0788123456", text: "1*1" }
 Response: CON Deal #42:\n1. Mark Shipped\n0. Back
 
-Request:  { sessionId: "abc", phoneNumber: "+250788123456", text: "1*1*1" }
+Request:  { sessionId: "abc", phoneNumber: "0788123456", text: "1*1*1" }
 Response: CON Enter your 4-digit PIN:
 
-Request:  { sessionId: "abc", phoneNumber: "+250788123456", text: "1*1*1*1234" }
+Request:  { sessionId: "abc", phoneNumber: "0788123456", text: "1*1*1*1234" }
 Response: END Marked as shipped!\nAll parties notified via SMS.
 ```
 
@@ -204,7 +204,7 @@ Always validate `sessionId` exists and hasn't expired before processing.
 
 ### 2. Phone Number Validation
 
-Validate and normalize phone numbers to E.164 format.
+Validate and normalize phone numbers to local 07XXXXXXXX.
 
 ### 3. PIN Masking
 
@@ -233,7 +233,7 @@ curl -X POST http://localhost:4000/ussd \
   -H "Content-Type: application/json" \
   -d '{
     "sessionId": "test123",
-    "phoneNumber": "+250788123456",
+    "phoneNumber": "0788123456",
     "text": ""
   }'
 ```

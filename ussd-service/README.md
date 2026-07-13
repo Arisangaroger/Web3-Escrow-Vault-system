@@ -2,6 +2,8 @@
 
 USSD simulation layer for the Agricultural Escrow Platform. Provides a feature-phone interface for users to interact with the escrow system via simulated USSD menus.
 
+**Status:** local-demo capable when backend is up — **not** production-ready. See `PHASE3_COMPLETE.md` for gaps.
+
 ## Quick Start
 
 ### Prerequisites
@@ -41,7 +43,7 @@ Open `simulator-ui/index.html` in your browser. You'll see 3 simulated phones re
 
 ### Simulator Interface
 
-1. **Enter phone number** in the header (e.g., `+250788111111`)
+1. **Enter phone number** in the header (e.g., `0788111111`)
 2. **Click "Dial"** to start a USSD session
 3. **Enter digits** in the input field
 4. **Click "Send"** or press Enter
@@ -49,30 +51,34 @@ Open `simulator-ui/index.html` in your browser. You'll see 3 simulated phones re
 
 ### Complete Deal Flow (3 Phones)
 
-**Phone 1 (Sender: +250788111111):**
-1. Dial → Set PIN (1111)
-2. Main Menu → 4 (Create Deal)
-3. Enter receiver: `+250788333333`
-4. Enter driver: `+250788222222`
-5. Enter amount: `1000`
-6. Confirm → PIN
+**Phone 1 (Sender: 0788111111) - First Time User:**
+1. Dial → Create Account (Set PIN: 1111)
+2. Confirm PIN: 1111
+3. Main Menu → 4 (Create Deal)
+4. Enter receiver: `0788333333`
+5. Enter driver: `0788222222`
+6. Enter amount: `1000`
+7. Confirm → PIN
 
-**Phone 3 (Receiver: +250788333333):**
-1. Dial → Set PIN (3333)
-2. Main Menu → 3 (My Purchases)
+**Phone 3 (Receiver: 0788333333) - First Time User:**
+1. Dial → Create Account (Set PIN: 3333)
+2. Confirm PIN: 3333
+3. Main Menu → 3 (My Purchases)
+4. Select deal
+5. Lock Funds → PIN
+
+**Phone 1 (Sender) - Returning User:**
+1. Dial → Enter PIN: 1111
+2. Main Menu → 1 (My Shipments)
 3. Select deal
-4. Lock Funds → PIN
+4. Mark Shipped → PIN
 
-**Phone 1 (Sender):**
-1. Main Menu → 1 (My Shipments)
-2. Select deal
-3. Mark Shipped → PIN
-
-**Phone 2 (Driver: +250788222222):**
-1. Dial → Set PIN (2222)
-2. Main Menu → 2 (My Deliveries)
-3. Select deal
-4. Mark Delivered → PIN
+**Phone 2 (Driver: 0788222222) - First Time User:**
+1. Dial → Create Account (Set PIN: 2222)
+2. Confirm PIN: 2222
+3. Main Menu → 2 (My Deliveries)
+4. Select deal
+5. Mark Delivered → PIN
 
 **All phones receive triangular broadcast SMS**
 
@@ -97,12 +103,13 @@ Blockchain
 
 #### 1. Session Store
 - In-memory session management
-- 30-second timeout (configurable)
+- 90-second timeout (configurable) - allows time for phone number entry
 - Automatic cleanup
 
-#### 2. Menu Nodes (14 total)
+#### 2. Menu Nodes (15 total)
 - PIN_SETUP
 - PIN_CONFIRM
+- PIN_LOGIN (authentication for returning users)
 - MAIN_MENU
 - DEAL_LIST
 - DEAL_ACTIONS
@@ -138,7 +145,7 @@ Main USSD endpoint (CON/END protocol)
 ```json
 {
   "sessionId": "abc123",
-  "phoneNumber": "+250788123456",
+  "phoneNumber": "0788123456",
   "text": "1*2*3"
 }
 ```
@@ -184,7 +191,7 @@ curl -X POST http://localhost:4000/ussd \
   -H "Content-Type: application/json" \
   -d '{
     "sessionId": "test1",
-    "phoneNumber": "+250788999999",
+    "phoneNumber": "0788999999",
     "text": ""
   }'
 
@@ -193,7 +200,7 @@ curl -X POST http://localhost:4000/ussd \
   -H "Content-Type: application/json" \
   -d '{
     "sessionId": "test1",
-    "phoneNumber": "+250788999999",
+    "phoneNumber": "0788999999",
     "text": "1"
   }'
 ```
@@ -230,24 +237,24 @@ curl -X POST http://localhost:4000/ussd \
 ```env
 PORT=4000                              # USSD server port
 BACKEND_API_URL=http://localhost:3000  # Phase 2 backend
-SESSION_TIMEOUT_SECONDS=30             # Session timeout
+SESSION_TIMEOUT_SECONDS=90             # Session timeout (90s allows phone number entry)
 SESSION_CLEANUP_INTERVAL_MS=60000      # Cleanup frequency
 USSD_SHORTCODE=*384*96#                # Display shortcode
 ```
 
 ### Session Timeout
 
-Default 30 seconds matches real USSD gateways. Increase for development:
+Default 90 seconds allows time for users to type phone numbers on feature phone keypads. Adjust if needed:
 
 ```env
-SESSION_TIMEOUT_SECONDS=60
+SESSION_TIMEOUT_SECONDS=120  # 2 minutes for very slow typers
 ```
 
 ## Troubleshooting
 
 ### "Session expired" immediately
 
-Check `SESSION_TIMEOUT_SECONDS` is reasonable (≥30).
+Check `SESSION_TIMEOUT_SECONDS` is reasonable (≥60 recommended).
 
 ### Backend errors
 
@@ -336,7 +343,7 @@ app.post('/ussd-gateway', (req, res) => {
 
 Server logs show each request:
 ```
-📱 USSD Request: +250788123456 | Session: abc123 | Input: "1*2"
+📱 USSD Request: 0788123456 | Session: abc123 | Input: "1*2"
 ```
 
 ### Debug Session
@@ -423,7 +430,7 @@ class MyCustomNode extends MenuNode {
 - Simulator UI
 - Documentation
 
-🎯 **Phase 3 Complete!**
+🎯 **Phase 3 demo scaffold**
 
-Ready for Phase 4 (Admin Portal) or production deployment.
+Ready for local three-phone demos (PIN, deals, Processing + SMS inbox) when backend + contracts are configured. Not a production USSD gateway.
 

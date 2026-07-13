@@ -8,24 +8,44 @@ class BackendClient {
   constructor(baseURL) {
     this.client = axios.create({
       baseURL,
-      timeout: 10000,
+      // Quick calls (pin-status, verify-pin, notifications). Chain actions use fire-and-forget from menus.
+      timeout: 15000,
       headers: {
         'Content-Type': 'application/json',
       },
     });
   }
 
-  /**
-   * Set PIN for first-time user
-   */
-  async setPin(phoneNumber, pin) {
-    const response = await this.client.post(`/users/${phoneNumber}/pin`, { pin });
-    return response.data;
+  encodePhone(phoneNumber) {
+    return encodeURIComponent(phoneNumber);
   }
 
   /**
-   * Create a new deal
+   * Whether user has completed PIN setup (new vs returning routing)
    */
+  async getPinStatus(phoneNumber) {
+    const response = await this.client.get(
+      `/users/${this.encodePhone(phoneNumber)}/pin-status`,
+    );
+    return response.data;
+  }
+
+  async setPin(phoneNumber, pin) {
+    const response = await this.client.post(
+      `/users/${this.encodePhone(phoneNumber)}/pin`,
+      { pin },
+    );
+    return response.data;
+  }
+
+  async verifyPin(phoneNumber, pin) {
+    const response = await this.client.post(
+      `/users/${this.encodePhone(phoneNumber)}/verify-pin`,
+      { pin },
+    );
+    return response.data;
+  }
+
   async createDeal(senderPhone, driverPhone, receiverPhone, amount, pin) {
     const response = await this.client.post('/deals', {
       senderPhone,
@@ -37,9 +57,6 @@ class BackendClient {
     return response.data;
   }
 
-  /**
-   * Lock funds into escrow
-   */
   async lockFunds(phoneNumber, dealId, pin) {
     const response = await this.client.post(`/deals/${dealId}/lock`, {
       phone: phoneNumber,
@@ -48,9 +65,6 @@ class BackendClient {
     return response.data;
   }
 
-  /**
-   * Mark goods as shipped
-   */
   async markShipped(phoneNumber, dealId, pin) {
     const response = await this.client.post(`/deals/${dealId}/ship`, {
       phone: phoneNumber,
@@ -59,9 +73,6 @@ class BackendClient {
     return response.data;
   }
 
-  /**
-   * Mark goods as delivered
-   */
   async markDelivered(phoneNumber, dealId, pin) {
     const response = await this.client.post(`/deals/${dealId}/deliver`, {
       phone: phoneNumber,
@@ -70,9 +81,6 @@ class BackendClient {
     return response.data;
   }
 
-  /**
-   * Revoke/dispute a deal
-   */
   async revokeDeal(phoneNumber, dealId, reasonCode, pin) {
     const response = await this.client.post(`/deals/${dealId}/revoke`, {
       phone: phoneNumber,
@@ -82,9 +90,6 @@ class BackendClient {
     return response.data;
   }
 
-  /**
-   * Cancel deal before funds locked
-   */
   async cancelDeal(phoneNumber, dealId, pin) {
     const response = await this.client.post(`/deals/${dealId}/cancel`, {
       phone: phoneNumber,
@@ -93,33 +98,25 @@ class BackendClient {
     return response.data;
   }
 
-  /**
-   * Get active deals for a phone number (role-segmented)
-   */
   async getActiveDeals(phoneNumber) {
-    const response = await this.client.get(`/users/${phoneNumber}/deals`);
+    const response = await this.client.get(
+      `/users/${this.encodePhone(phoneNumber)}/deals`,
+    );
     return response.data;
   }
 
-  /**
-   * Get specific deal details
-   */
   async getDealDetails(dealId) {
     const response = await this.client.get(`/deals/${dealId}`);
     return response.data;
   }
 
-  /**
-   * Get notifications for a phone number
-   */
   async getNotifications(phoneNumber) {
-    const response = await this.client.get(`/users/${phoneNumber}/notifications`);
+    const response = await this.client.get(
+      `/users/${this.encodePhone(phoneNumber)}/notifications`,
+    );
     return response.data;
   }
 
-  /**
-   * Health check
-   */
   async healthCheck() {
     const response = await this.client.get('/health');
     return response.data;

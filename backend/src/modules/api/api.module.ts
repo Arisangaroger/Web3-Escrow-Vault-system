@@ -4,6 +4,7 @@ import { WalletsModule } from '../wallets/wallets.module';
 import { AuthModule } from '../auth/auth.module';
 import { DealsModule } from '../services/deals.module';
 import { ContractsModule } from '../contracts/contracts.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { ContractsModule } from '../contracts/contracts.module';
     AuthModule,
     DealsModule,
     ContractsModule,
+    NotificationsModule,
   ],
   controllers: [ApiController],
 })

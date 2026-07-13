@@ -5,13 +5,18 @@ Complete navigation structure for the Escrow Platform USSD interface.
 ## Tree Diagram
 
 ```
-INITIAL
+INITIAL DIAL
 ├─> [New User] PIN_SETUP
 │   └─> PIN_CONFIRM
 │       ├─> [Match] MAIN_MENU
 │       └─> [Mismatch] PIN_SETUP (retry)
 │
-└─> [Existing User] MAIN_MENU
+└─> [Existing User] PIN_LOGIN
+    ├─> [Correct PIN] MAIN_MENU
+    ├─> [Incorrect PIN] PIN_LOGIN (retry, up to 5 attempts)
+    └─> [5 Failed Attempts] END (Account locked 15 minutes)
+        
+MAIN_MENU (requires authentication)
     ├─> 1. My Shipments → DEAL_LIST (asSeller)
     ├─> 2. My Deliveries → DEAL_LIST (asDriver)
     ├─> 3. My Purchases → DEAL_LIST (asBuyer)
@@ -20,8 +25,18 @@ INITIAL
 
 ## Node Details
 
+### PIN_LOGIN (NEW)
+**Purpose:** Authentication for returning users  
+**Input:** 4 digits  
+**Next:** 
+- MAIN_MENU (if PIN correct)
+- PIN_LOGIN (if PIN incorrect, show attempts remaining)
+- END (if account locked after 5 failed attempts)
+**Validation:** Calls backend `POST /users/:phone/verify-pin`
+
 ### PIN_SETUP
-**Purpose:** First-time PIN creation  
+**Purpose:** First-time account creation  
+**Display:** "Welcome! Create your account.\nSet your 4-digit PIN:"
 **Input:** 4 digits  
 **Next:** PIN_CONFIRM  
 **Validation:** Must be exactly 4 digits
@@ -142,7 +157,7 @@ MAIN_MENU (select 4)
 **Purpose:** Enter receiver phone number  
 **Input:** Phone number  
 **Validation:**
-- Valid format (+250788123456)
+- Valid format (0788123456)
 - Not same as sender
 
 **Next:** CREATE_DEAL_DRIVER
@@ -169,8 +184,8 @@ MAIN_MENU (select 4)
 **Display:**
 ```
 Confirm New Deal:
-Receiver: +250788333333
-Driver: +250788222222
+Receiver: 0788333333
+Driver: 0788222222
 Amount: 1000 RWF
 
 1. Confirm
@@ -201,7 +216,7 @@ Amount: 1000 RWF
 
 ### Session End Triggers
 - Explicit END message from node
-- Session timeout (30 seconds)
+- Session timeout (90 seconds of inactivity per screen)
 - System error
 
 ## State Management
@@ -242,7 +257,7 @@ Actual confirmation comes via SMS notification (triangular broadcast).
 
 **Why:** 
 - Blockchain transactions take 2-5 seconds
-- Real USSD gateways timeout after 20-30 seconds
+- Real USSD gateways timeout after 60-180 seconds
 - This pattern avoids blocking users
 
 ## Testing Scenarios

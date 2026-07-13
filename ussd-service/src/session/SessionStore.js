@@ -3,7 +3,7 @@
  * Tracks USSD session state across multiple request/response cycles
  */
 class SessionStore {
-  constructor(timeoutSeconds = 30, cleanupIntervalMs = 60000) {
+  constructor(timeoutSeconds = 90, cleanupIntervalMs = 60000) {
     this.sessions = new Map();
     this.timeoutMs = timeoutSeconds * 1000;
     this.cleanupIntervalMs = cleanupIntervalMs;

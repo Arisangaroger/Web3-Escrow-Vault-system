@@ -10,7 +10,7 @@ class CreateDealReceiverNode extends MenuNode {
   }
 
   async render(session) {
-    return this.con('Create New Deal\nEnter Receiver (Buyer) phone:\n(Format: +250788123456)');
+    return this.con('Create New Deal\nEnter Receiver (Buyer) phone:\n(Format: 0788123456)');
   }
 
   async handleInput(input, session, sessionStore, backendClient) {
@@ -19,7 +19,7 @@ class CreateDealReceiverNode extends MenuNode {
     if (!isValidPhoneNumber(phone)) {
       return {
         nextNode: 'CREATE_DEAL_RECEIVER',
-        message: this.con('Invalid phone number.\nEnter Receiver phone:\n(+250788123456)'),
+        message: this.con('Invalid phone number.\nEnter Receiver phone:\n(0788123456)'),
       };
     }
 
@@ -42,7 +42,7 @@ class CreateDealReceiverNode extends MenuNode {
 
     return {
       nextNode: 'CREATE_DEAL_DRIVER',
-      message: this.con('Enter Driver phone:\n(+250788123456)'),
+      message: this.con('Enter Driver phone:\n(0788123456)'),
     };
   }
 }

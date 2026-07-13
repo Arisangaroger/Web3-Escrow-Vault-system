@@ -6,6 +6,7 @@ const MenuRegistry = require('./MenuRegistry');
 // Import all menu nodes
 const PinSetupNode = require('./nodes/PinSetupNode');
 const PinConfirmNode = require('./nodes/PinConfirmNode');
+const PinLoginNode = require('./nodes/PinLoginNode');
 const MainMenuNode = require('./nodes/MainMenuNode');
 const DealListNode = require('./nodes/DealListNode');
 const DealActionsNode = require('./nodes/DealActionsNode');
@@ -28,6 +29,7 @@ function createMenuRegistry() {
   // Register all nodes
   registry.register(new PinSetupNode());
   registry.register(new PinConfirmNode());
+  registry.register(new PinLoginNode());
   registry.register(new MainMenuNode());
   registry.register(new DealListNode());
   registry.register(new DealActionsNode());

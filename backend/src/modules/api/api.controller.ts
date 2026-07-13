@@ -12,6 +12,7 @@ import { WalletsService } from '../wallets/wallets.service';
 import { AuthService } from '../auth/auth.service';
 import { DealsService } from '../services/deals.service';
 import { ContractsService } from '../contracts/contracts.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { SetPinDto } from './dto/set-pin.dto';
 import { CreateDealDto } from './dto/create-deal.dto';
 import { DealActionDto, RevokeDto, ResolveDisputeDto } from './dto/deal-action.dto';
@@ -25,6 +26,7 @@ export class ApiController {
     private authService: AuthService,
     private dealsService: DealsService,
     private contractsService: ContractsService,
+    private notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -45,6 +47,35 @@ export class ApiController {
         success: true,
         data: { message: 'PIN set successfully' },
       };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Verify PIN (for login authentication)
+   * POST /users/:phone/verify-pin
+   */
+  @Post('users/:phone/verify-pin')
+  @HttpCode(HttpStatus.OK)
+  async verifyPin(@Param('phone') phone: string, @Body() dto: SetPinDto) {
+    try {
+      const isValid = await this.authService.verifyPin(phone, dto.pin);
+
+      if (isValid) {
+        return {
+          success: true,
+          data: { message: 'PIN verified' },
+        };
+      } else {
+        return {
+          success: false,
+          error: 'Invalid PIN',
+        };
+      }
     } catch (error) {
       return {
         success: false,
@@ -211,6 +242,48 @@ export class ApiController {
       };
     } catch (error) {
       this.logger.error(`Cancel error: ${error.message}`);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Check whether a user has a PIN set (for USSD new vs returning routing)
+   * GET /users/:phone/pin-status
+   */
+  @Get('users/:phone/pin-status')
+  async getPinStatus(@Param('phone') phone: string) {
+    try {
+      const hasPin = await this.authService.hasPinSet(phone);
+      return {
+        success: true,
+        data: { hasPin: Boolean(hasPin) },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Recent SMS notifications for a phone (simulator inbox)
+   * GET /users/:phone/notifications
+   */
+  @Get('users/:phone/notifications')
+  async getNotifications(@Param('phone') phone: string) {
+    try {
+      const notifications =
+        await this.notificationsService.getNotificationsForPhone(phone);
+      return {
+        success: true,
+        data: notifications,
+      };
+    } catch (error) {
+      this.logger.error(`Get notifications error: ${error.message}`);
       return {
         success: false,
         error: error.message,

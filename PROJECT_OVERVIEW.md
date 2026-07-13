@@ -268,7 +268,7 @@ Use 3 phones in simulator:
 - ✅ Meta-transaction signature verification
 
 ### USSD Level
-- ✅ Session timeout (30 seconds)
+- ✅ Session timeout (90 seconds per screen - allows phone number entry)
 - ✅ Input sanitization
 - ✅ Error handling (no crashes)
 - ✅ PIN masking in logs
@@ -284,7 +284,7 @@ Use 3 phones in simulator:
 - **Mark Delivered:** ~95k gas
 - **Backend API Response:** <200ms
 - **Blockchain Confirmation:** 2-5 seconds
-- **USSD Session Timeout:** 30 seconds
+- **USSD Session Timeout:** 90 seconds per screen
 
 ### Scalability
 - **Concurrent USSD Sessions:** 10,000+

@@ -1,48 +1,40 @@
 /**
  * Input validation utilities for USSD screens
+ * Project standard phone format: local Rwanda MSISDN 07XXXXXXXX (e.g. 0788123456)
  */
 
 /**
- * Validate phone number format
+ * Validate phone number format (accepts 07…, 2507…, +2507…; stored/used as 07…)
  */
 function isValidPhoneNumber(input) {
-  // Accept formats: +250788123456, 250788123456, 0788123456
-  const cleaned = input.trim().replace(/\s+/g, '');
-  
-  // International format with +
-  if (/^\+\d{10,15}$/.test(cleaned)) return true;
-  
-  // Country code without +
-  if (/^250\d{9}$/.test(cleaned)) return true;
-  
-  // Local format starting with 0
-  if (/^0\d{9}$/.test(cleaned)) return true;
-  
+  const cleaned = input.trim().replace(/[\s-]+/g, '');
+
+  if (/^07\d{8}$/.test(cleaned)) return true;
+  if (/^2507\d{8}$/.test(cleaned)) return true;
+  if (/^\+2507\d{8}$/.test(cleaned)) return true;
+
   return false;
 }
 
 /**
- * Normalize phone number to E.164 format (+250788123456)
+ * Normalize to local 07XXXXXXXX (not +250…)
  */
 function normalizePhoneNumber(input) {
-  const cleaned = input.trim().replace(/\s+/g, '');
-  
-  // Already in international format
-  if (cleaned.startsWith('+250')) {
+  const cleaned = input.trim().replace(/[\s-]+/g, '');
+
+  if (/^07\d{8}$/.test(cleaned)) {
     return cleaned;
   }
-  
-  // Country code without +
-  if (cleaned.startsWith('250')) {
-    return '+' + cleaned;
+
+  if (/^\+2507\d{8}$/.test(cleaned)) {
+    return '0' + cleaned.slice(4);
   }
-  
-  // Local format (07...)
-  if (cleaned.startsWith('0')) {
-    return '+250' + cleaned.substring(1);
+
+  if (/^2507\d{8}$/.test(cleaned)) {
+    return '0' + cleaned.slice(3);
   }
-  
-  return input; // Return as-is if can't normalize
+
+  return cleaned;
 }
 
 /**
@@ -75,6 +67,16 @@ function isNumeric(input) {
   return /^\d+$/.test(input.trim());
 }
 
+/**
+ * Redact likely PIN segments from USSD accumulated text for logs
+ */
+function redactUssdText(text) {
+  if (!text) return '';
+  const parts = String(text).split('*');
+  const redacted = parts.map((part) => (/^\d{4}$/.test(part) ? '****' : part));
+  return redacted.join('*');
+}
+
 module.exports = {
   isValidPhoneNumber,
   normalizePhoneNumber,
@@ -82,4 +84,5 @@ module.exports = {
   isValidAmount,
   isValidChoice,
   isNumeric,
+  redactUssdText,
 };
