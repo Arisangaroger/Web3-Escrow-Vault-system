@@ -30,6 +30,11 @@ export class LoggerService {
     logger.info({ context: this.context, ...data }, message);
   }
 
+  /** Nest-style alias used across services */
+  log(message: string, data?: any) {
+    this.info(message, data);
+  }
+
   warn(message: string, data?: any) {
     logger.warn({ context: this.context, ...data }, message);
   }

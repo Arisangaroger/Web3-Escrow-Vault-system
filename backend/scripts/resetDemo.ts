@@ -1,3 +1,9 @@
+/**
+ * Clears demo users / deals / logs from the DB.
+ * Does not roll back on-chain Escrow state — redeploy or use a fresh local chain
+ * if you need a clean blockchain alongside a clean DB.
+ */
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -11,25 +17,9 @@ const DEMO_PHONES = [
 ];
 
 async function main() {
-  console.log('🧹 Resetting demo data...\n');
+  console.log('🧹 Resetting demo data (DB only)...\n');
 
-  // Delete in correct order (respect foreign keys)
-  console.log('Deleting notifications log...');
-  await prisma.notificationsLog.deleteMany({
-    where: {
-      recipientPhone: { in: DEMO_PHONES },
-    },
-  });
-
-  console.log('Deleting deal action logs...');
-  await prisma.dealActionLog.deleteMany({
-    where: {
-      actorPhone: { in: DEMO_PHONES },
-    },
-  });
-
-  console.log('Deleting deals...');
-  await prisma.deal.deleteMany({
+  const deals = await prisma.deal.findMany({
     where: {
       OR: [
         { senderPhone: { in: DEMO_PHONES } },
@@ -37,17 +27,36 @@ async function main() {
         { receiverPhone: { in: DEMO_PHONES } },
       ],
     },
+    select: { dealId: true },
+  });
+  const dealIds = deals.map((d) => d.dealId);
+
+  if (dealIds.length > 0) {
+    console.log(`Deleting action logs for ${dealIds.length} demo deal(s)...`);
+    await prisma.dealActionLog.deleteMany({ where: { dealId: { in: dealIds } } });
+
+    console.log('Deleting notification logs for demo deals...');
+    await prisma.notificationLog.deleteMany({ where: { dealId: { in: dealIds } } });
+
+    console.log('Deleting demo deals...');
+    await prisma.deal.deleteMany({ where: { dealId: { in: dealIds } } });
+  } else {
+    console.log('No demo deals found.');
+  }
+
+  console.log('Deleting leftover notifications for demo phones...');
+  await prisma.notificationLog.deleteMany({
+    where: { recipientPhone: { in: DEMO_PHONES } },
   });
 
   console.log('Deleting demo users...');
   await prisma.user.deleteMany({
-    where: {
-      phoneNumber: { in: DEMO_PHONES },
-    },
+    where: { phoneNumber: { in: DEMO_PHONES } },
   });
 
-  console.log('\n✅ Demo data reset successfully!');
-  console.log('\n💡 Run `npm run seed:demo` to recreate demo data');
+  console.log('\n✅ Demo DB reset complete.');
+  console.log('💡 On-chain: start a fresh Hardhat node + redeploy if deal IDs must restart at 0.');
+  console.log('💡 Then: npm run seed:demo');
 }
 
 main()

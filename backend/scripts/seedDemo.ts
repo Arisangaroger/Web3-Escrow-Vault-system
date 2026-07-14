@@ -1,8 +1,21 @@
-import { PrismaClient } from '@prisma/client';
-import * as argon2 from 'argon2';
+/**
+ * Demo seed: creates users (ENCRYPTION_KEY wallets + PINs), mints eRWF to buyers,
+ * and drives real on-chain deals into Created / FundsLocked / Shipped / Delivered / Disputed.
+ *
+ * Prerequisites: local node or Amoy with deployed Escrow + eRWF, backend `.env` filled.
+ * Prefer: npm run reset:demo && npm run seed:demo
+ */
+import 'dotenv/config';
+import { NestFactory } from '@nestjs/core';
 import { ethers } from 'ethers';
-
-const prisma = new PrismaClient();
+import { DealStatus } from '@prisma/client';
+import { AppModule } from '../src/app.module';
+import { PrismaService } from '../src/modules/db/prisma.service';
+import { WalletsService } from '../src/modules/wallets/wallets.service';
+import { AuthService } from '../src/modules/auth/auth.service';
+import { DealsService } from '../src/modules/services/deals.service';
+import { ContractsService } from '../src/modules/contracts/contracts.service';
+import { GasRelayService } from '../src/modules/contracts/gas-relay.service';
 
 const DEMO_USERS = [
   {
@@ -35,202 +48,290 @@ const DEMO_USERS = [
     pin: '5555',
     role: 'Buyer/Receiver',
   },
-];
+] as const;
 
-async function main() {
-  console.log('🌱 Seeding demo data...\n');
+const DEMO_PHONES = DEMO_USERS.map((u) => u.phone);
+const BUYER_PHONES = ['+250788200002', '+250788200005'];
+const MINT_AMOUNT = '10000000'; // eRWF per buyer
 
-  const pepper = process.env.PIN_PEPPER || 'demo-pepper-change-in-production';
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-  // 1. Create demo users with wallets
-  console.log('Creating demo users...');
-  for (const user of DEMO_USERS) {
-    const wallet = ethers.Wallet.createRandom();
-    const encryptedKey = await wallet.encrypt('password');
-    const pinHash = await argon2.hash(user.pin + pepper, {
-      type: argon2.argon2id,
-      memoryCost: 65536,
-      timeCost: 3,
-      parallelism: 4,
-    });
+async function clearDemoData(prisma: PrismaService) {
+  const deals = await prisma.deal.findMany({
+    where: {
+      OR: [
+        { senderPhone: { in: DEMO_PHONES } },
+        { driverPhone: { in: DEMO_PHONES } },
+        { receiverPhone: { in: DEMO_PHONES } },
+      ],
+    },
+    select: { dealId: true },
+  });
+  const dealIds = deals.map((d) => d.dealId);
 
-    await prisma.user.upsert({
-      where: { phoneNumber: user.phone },
-      create: {
-        phoneNumber: user.phone,
-        walletAddress: wallet.address,
-        encryptedPrivateKey: encryptedKey,
-        pinHash,
-      },
-      update: {
-        pinHash,
-      },
-    });
-
-    console.log(`  ✅ ${user.name} (${user.phone}) - PIN: ${user.pin}`);
+  if (dealIds.length > 0) {
+    await prisma.dealActionLog.deleteMany({ where: { dealId: { in: dealIds } } });
+    await prisma.notificationLog.deleteMany({ where: { dealId: { in: dealIds } } });
+    await prisma.deal.deleteMany({ where: { dealId: { in: dealIds } } });
   }
 
-  // 2. Create demo deals in various states
-  console.log('\nCreating demo deals...');
-
-  const now = new Date();
-  const hour = 60 * 60 * 1000;
-
-  // Deal 1: Created (awaiting fund lock)
-  const deal1 = await prisma.deal.create({
-    data: {
-      senderPhone: DEMO_USERS[0].phone,
-      driverPhone: DEMO_USERS[2].phone,
-      receiverPhone: DEMO_USERS[1].phone,
-      amount: 300000,
-      status: 'Created',
-      createdAt: new Date(now.getTime() - 2 * hour),
-      fundLockDeadline: new Date(now.getTime() + 22 * hour), // 22 hours left
-    },
+  await prisma.notificationLog.deleteMany({
+    where: { recipientPhone: { in: DEMO_PHONES } },
   });
-  console.log(`  ✅ Deal #${deal1.dealId}: Created (awaiting fund lock)`);
-
-  // Deal 2: FundsLocked (ready to ship)
-  const deal2 = await prisma.deal.create({
-    data: {
-      senderPhone: DEMO_USERS[3].phone,
-      driverPhone: DEMO_USERS[2].phone,
-      receiverPhone: DEMO_USERS[4].phone,
-      amount: 500000,
-      status: 'FundsLocked',
-      createdAt: new Date(now.getTime() - 4 * hour),
-      fundLockDeadline: new Date(now.getTime() + 20 * hour),
-    },
-  });
-  console.log(`  ✅ Deal #${deal2.dealId}: FundsLocked (ready to ship)`);
-
-  // Deal 3: Shipped (in transit)
-  const deal3 = await prisma.deal.create({
-    data: {
-      senderPhone: DEMO_USERS[0].phone,
-      driverPhone: DEMO_USERS[2].phone,
-      receiverPhone: DEMO_USERS[4].phone,
-      amount: 450000,
-      status: 'Shipped',
-      createdAt: new Date(now.getTime() - 6 * hour),
-      fundLockDeadline: new Date(now.getTime() + 18 * hour),
-    },
-  });
-  console.log(`  ✅ Deal #${deal3.dealId}: Shipped (in transit)`);
-
-  // Deal 4: Delivered (near auto-release)
-  const deal4 = await prisma.deal.create({
-    data: {
-      senderPhone: DEMO_USERS[3].phone,
-      driverPhone: DEMO_USERS[2].phone,
-      receiverPhone: DEMO_USERS[1].phone,
-      amount: 600000,
-      status: 'Delivered',
-      createdAt: new Date(now.getTime() - 9 * hour),
-      fundLockDeadline: new Date(now.getTime() + 15 * hour),
-      payoutReadyTime: new Date(now.getTime() + 5 * 60 * 1000), // 5 minutes from now
-    },
-  });
-  console.log(`  ✅ Deal #${deal4.dealId}: Delivered (auto-releases in 5 min)`);
-
-  // Deal 5: Disputed (ready for admin)
-  const deal5 = await prisma.deal.create({
-    data: {
-      senderPhone: DEMO_USERS[0].phone,
-      driverPhone: DEMO_USERS[2].phone,
-      receiverPhone: DEMO_USERS[1].phone,
-      amount: 400000,
-      status: 'Disputed',
-      disputeReasonCode: 1,
-      createdAt: new Date(now.getTime() - 12 * hour),
-      fundLockDeadline: new Date(now.getTime() + 12 * hour),
-    },
-  });
-  console.log(`  ✅ Deal #${deal5.dealId}: Disputed (ready for admin resolution)`);
-
-  // 3. Create action logs for realistic timeline
-  console.log('\nCreating action logs...');
-  await prisma.dealActionLog.createMany({
-    data: [
-      {
-        dealId: deal2.dealId,
-        actorPhone: DEMO_USERS[4].phone,
-        action: 'FundsLocked',
-        timestamp: new Date(now.getTime() - 3.5 * hour),
-      },
-      {
-        dealId: deal3.dealId,
-        actorPhone: DEMO_USERS[4].phone,
-        action: 'FundsLocked',
-        timestamp: new Date(now.getTime() - 5.5 * hour),
-      },
-      {
-        dealId: deal3.dealId,
-        actorPhone: DEMO_USERS[0].phone,
-        action: 'MarkedShipped',
-        timestamp: new Date(now.getTime() - 5 * hour),
-      },
-      {
-        dealId: deal4.dealId,
-        actorPhone: DEMO_USERS[1].phone,
-        action: 'FundsLocked',
-        timestamp: new Date(now.getTime() - 8.5 * hour),
-      },
-      {
-        dealId: deal4.dealId,
-        actorPhone: DEMO_USERS[3].phone,
-        action: 'MarkedShipped',
-        timestamp: new Date(now.getTime() - 8 * hour),
-      },
-      {
-        dealId: deal4.dealId,
-        actorPhone: DEMO_USERS[2].phone,
-        action: 'MarkedDelivered',
-        timestamp: new Date(now.getTime() - 3 * hour),
-      },
-      {
-        dealId: deal5.dealId,
-        actorPhone: DEMO_USERS[1].phone,
-        action: 'FundsLocked',
-        timestamp: new Date(now.getTime() - 11.5 * hour),
-      },
-      {
-        dealId: deal5.dealId,
-        actorPhone: DEMO_USERS[0].phone,
-        action: 'MarkedShipped',
-        timestamp: new Date(now.getTime() - 11 * hour),
-      },
-      {
-        dealId: deal5.dealId,
-        actorPhone: DEMO_USERS[2].phone,
-        action: 'MarkedDelivered',
-        timestamp: new Date(now.getTime() - 10.9 * hour), // Suspiciously fast!
-      },
-      {
-        dealId: deal5.dealId,
-        actorPhone: DEMO_USERS[1].phone,
-        action: 'Revoked',
-        timestamp: new Date(now.getTime() - 10.5 * hour),
-      },
-    ],
-  });
-  console.log('  ✅ Action logs created');
-
-  console.log('\n✅ Demo data seeded successfully!');
-  console.log('\n📋 Demo Credentials (save these for testing):');
-  console.log('─'.repeat(60));
-  DEMO_USERS.forEach((user) => {
-    console.log(`${user.name.padEnd(25)} ${user.phone.padEnd(20)} PIN: ${user.pin}`);
-  });
-  console.log('─'.repeat(60));
-  console.log('\n💡 Tip: Save these credentials to DEMO_CREDENTIALS.md');
+  await prisma.user.deleteMany({ where: { phoneNumber: { in: DEMO_PHONES } } });
 }
 
-main()
-  .catch((e) => {
-    console.error('❌ Seed failed:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
+async function logAction(
+  prisma: PrismaService,
+  dealId: number,
+  actorPhone: string,
+  action: string,
+  txHash: string,
+) {
+  await prisma.dealActionLog.create({
+    data: { dealId, actorPhone, action, txHash, timestamp: new Date() },
   });
+}
+
+async function setStatus(
+  prisma: PrismaService,
+  dealId: number,
+  status: DealStatus,
+  extra: Record<string, unknown> = {},
+) {
+  await prisma.deal.update({
+    where: { dealId },
+    data: { status, ...extra },
+  });
+}
+
+async function maybeWarpDisputeWindow(
+  gasRelay: GasRelayService,
+  chainId: number,
+) {
+  // Leave ~5 minutes before payoutReadyTime on local Hardhat only
+  if (chainId !== 31337 && chainId !== 1337) {
+    console.log(
+      '  ⚠️  Non-local chain: cannot time-warp. Delivered demo deal keeps the full ~3h dispute window.',
+    );
+    return;
+  }
+
+  const provider = gasRelay.getProvider() as ethers.JsonRpcProvider;
+  const warpSeconds = 3 * 60 * 60 - 5 * 60; // 2h55m
+  await provider.send('evm_increaseTime', [warpSeconds]);
+  await provider.send('evm_mine', []);
+  console.log('  ⏱  Hardhat time advanced (~2h55m) so Delivered deal is ~5 min from release');
+}
+
+async function main() {
+  console.log('🌱 Seeding demo data (on-chain + DB)...\n');
+
+  const required = [
+    'DATABASE_URL',
+    'RPC_URL',
+    'CHAIN_ID',
+    'ESCROW_CONTRACT_ADDRESS',
+    'ERWF_CONTRACT_ADDRESS',
+    'TREASURY_PRIVATE_KEY',
+    'ENCRYPTION_KEY',
+    'PIN_PEPPER',
+  ];
+  const missing = required.filter((k) => !process.env[k]?.trim());
+  if (missing.length) {
+    throw new Error(`Missing env: ${missing.join(', ')}. Fill backend/.env first.`);
+  }
+
+  const app = await NestFactory.createApplicationContext(AppModule, {
+    logger: ['error', 'warn', 'log'],
+  });
+
+  const prisma = app.get(PrismaService);
+  const wallets = app.get(WalletsService);
+  const auth = app.get(AuthService);
+  const deals = app.get(DealsService);
+  const contracts = app.get(ContractsService);
+  const gasRelay = app.get(GasRelayService);
+  const chainId = contracts.getChainId();
+
+  try {
+    console.log('Clearing previous demo users/deals...');
+    await clearDemoData(prisma);
+    console.log('  ✅ Cleared\n');
+
+    // 1. Users with custodial wallets encrypted by ENCRYPTION_KEY
+    console.log('Creating demo users (ENCRYPTION_KEY wallets + PINs)...');
+    for (const user of DEMO_USERS) {
+      await wallets.getOrCreateWallet(user.phone);
+      await auth.setPin(user.phone, user.pin);
+      const address = await wallets.getWalletAddress(user.phone);
+      console.log(`  ✅ ${user.name} ${user.phone} PIN ${user.pin} → ${address}`);
+    }
+
+    // 2. Mint eRWF to buyers so lockFunds can succeed
+    console.log(`\nMinting ${MINT_AMOUNT} eRWF to demo buyers...`);
+    for (const phone of BUYER_PHONES) {
+      const address = await wallets.getWalletAddress(phone);
+      const txHash = await contracts.mintTokens(address, MINT_AMOUNT);
+      console.log(`  ✅ Minted to ${phone} (${address}) tx=${txHash}`);
+    }
+
+    // 3. On-chain deals + DB rows in five lifecycle states
+    console.log('\nCreating on-chain deals...\n');
+
+    // --- Deal A: Created (awaiting fund lock) ---
+    const a = await deals.createDeal(
+      DEMO_USERS[0].phone,
+      DEMO_USERS[2].phone,
+      DEMO_USERS[1].phone,
+      '300000',
+      DEMO_USERS[0].pin,
+    );
+    await logAction(prisma, a.dealId, DEMO_USERS[0].phone, 'DealCreated', a.txHash);
+    console.log(`  ✅ Deal #${a.dealId}: Created (awaiting fund lock)`);
+
+    // --- Deal B: FundsLocked ---
+    const b = await deals.createDeal(
+      DEMO_USERS[3].phone,
+      DEMO_USERS[2].phone,
+      DEMO_USERS[4].phone,
+      '500000',
+      DEMO_USERS[3].pin,
+    );
+    const bLock = await deals.lockFunds(
+      DEMO_USERS[4].phone,
+      b.dealId,
+      DEMO_USERS[4].pin,
+    );
+    await setStatus(prisma, b.dealId, DealStatus.FundsLocked);
+    await logAction(prisma, b.dealId, DEMO_USERS[4].phone, 'FundsLocked', bLock);
+    console.log(`  ✅ Deal #${b.dealId}: FundsLocked (ready to ship)`);
+
+    // --- Deal C: Shipped ---
+    const c = await deals.createDeal(
+      DEMO_USERS[0].phone,
+      DEMO_USERS[2].phone,
+      DEMO_USERS[4].phone,
+      '450000',
+      DEMO_USERS[0].pin,
+    );
+    const cLock = await deals.lockFunds(
+      DEMO_USERS[4].phone,
+      c.dealId,
+      DEMO_USERS[4].pin,
+    );
+    await setStatus(prisma, c.dealId, DealStatus.FundsLocked);
+    await logAction(prisma, c.dealId, DEMO_USERS[4].phone, 'FundsLocked', cLock);
+    const cShip = await deals.markShipped(
+      DEMO_USERS[0].phone,
+      c.dealId,
+      DEMO_USERS[0].pin,
+    );
+    await setStatus(prisma, c.dealId, DealStatus.Shipped);
+    await logAction(prisma, c.dealId, DEMO_USERS[0].phone, 'MarkedShipped', cShip);
+    console.log(`  ✅ Deal #${c.dealId}: Shipped (in transit)`);
+
+    // --- Deal D: Delivered (near auto-release on local) ---
+    const d = await deals.createDeal(
+      DEMO_USERS[3].phone,
+      DEMO_USERS[2].phone,
+      DEMO_USERS[1].phone,
+      '600000',
+      DEMO_USERS[3].pin,
+    );
+    const dLock = await deals.lockFunds(
+      DEMO_USERS[1].phone,
+      d.dealId,
+      DEMO_USERS[1].pin,
+    );
+    await setStatus(prisma, d.dealId, DealStatus.FundsLocked);
+    await logAction(prisma, d.dealId, DEMO_USERS[1].phone, 'FundsLocked', dLock);
+    const dShip = await deals.markShipped(
+      DEMO_USERS[3].phone,
+      d.dealId,
+      DEMO_USERS[3].pin,
+    );
+    await setStatus(prisma, d.dealId, DealStatus.Shipped);
+    await logAction(prisma, d.dealId, DEMO_USERS[3].phone, 'MarkedShipped', dShip);
+    const dDel = await deals.markDelivered(
+      DEMO_USERS[2].phone,
+      d.dealId,
+      DEMO_USERS[2].pin,
+    );
+
+    await maybeWarpDisputeWindow(gasRelay, chainId);
+
+    const onChain = await contracts.getDealFromChain(d.dealId);
+    const payoutReadyTime = new Date(Number(onChain.payoutReadyTime) * 1000);
+    await setStatus(prisma, d.dealId, DealStatus.Delivered, { payoutReadyTime });
+    await logAction(prisma, d.dealId, DEMO_USERS[2].phone, 'MarkedDelivered', dDel);
+    console.log(
+      `  ✅ Deal #${d.dealId}: Delivered (payoutReadyTime=${payoutReadyTime.toISOString()})`,
+    );
+
+    // --- Deal E: Disputed (admin portal) ---
+    const e = await deals.createDeal(
+      DEMO_USERS[0].phone,
+      DEMO_USERS[2].phone,
+      DEMO_USERS[1].phone,
+      '400000',
+      DEMO_USERS[0].pin,
+    );
+    const eLock = await deals.lockFunds(
+      DEMO_USERS[1].phone,
+      e.dealId,
+      DEMO_USERS[1].pin,
+    );
+    await setStatus(prisma, e.dealId, DealStatus.FundsLocked);
+    await logAction(prisma, e.dealId, DEMO_USERS[1].phone, 'FundsLocked', eLock);
+    const eShip = await deals.markShipped(
+      DEMO_USERS[0].phone,
+      e.dealId,
+      DEMO_USERS[0].pin,
+    );
+    await setStatus(prisma, e.dealId, DealStatus.Shipped);
+    await logAction(prisma, e.dealId, DEMO_USERS[0].phone, 'MarkedShipped', eShip);
+    const eDel = await deals.markDelivered(
+      DEMO_USERS[2].phone,
+      e.dealId,
+      DEMO_USERS[2].pin,
+    );
+    await setStatus(prisma, e.dealId, DealStatus.Delivered);
+    await logAction(prisma, e.dealId, DEMO_USERS[2].phone, 'MarkedDelivered', eDel);
+    // Brief pause so "early deliver" timeline still makes sense in portal
+    await sleep(500);
+    const eRevoke = await deals.revoke(
+      DEMO_USERS[1].phone,
+      e.dealId,
+      1,
+      DEMO_USERS[1].pin,
+    );
+    await setStatus(prisma, e.dealId, DealStatus.Disputed, {
+      disputeReasonCode: 1,
+    });
+    await logAction(prisma, e.dealId, DEMO_USERS[1].phone, 'Revoked', eRevoke);
+    console.log(`  ✅ Deal #${e.dealId}: Disputed (ready for admin resolution)`);
+
+    console.log('\n✅ Demo seed complete (chain + DB).\n');
+    console.log('📋 Credentials');
+    console.log('─'.repeat(64));
+    DEMO_USERS.forEach((u) => {
+      console.log(`${u.name.padEnd(25)} ${u.phone.padEnd(16)} PIN ${u.pin}  [${u.role}]`);
+    });
+    console.log('─'.repeat(64));
+    console.log('\nDeals:');
+    console.log(`  #${a.dealId} Created`);
+    console.log(`  #${b.dealId} FundsLocked`);
+    console.log(`  #${c.dealId} Shipped`);
+    console.log(`  #${d.dealId} Delivered`);
+    console.log(`  #${e.dealId} Disputed`);
+    console.log('\nSee DEMO_CREDENTIALS.md for the walkthrough.');
+  } finally {
+    await app.close();
+  }
+}
+
+main().catch((err) => {
+  console.error('❌ Seed failed:', err);
+  process.exit(1);
+});

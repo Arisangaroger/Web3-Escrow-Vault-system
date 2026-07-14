@@ -24,15 +24,19 @@ After running `npm run seed:demo` in the `backend` folder:
 
 ## Demo Deal States (After Seed)
 
-The seed script creates 5 deals in various states to demonstrate all system features:
+`npm run seed:demo` now creates **real on-chain Escrow deals** (plus matching DB rows), mints eRWF to buyers, and encrypts wallets with `ENCRYPTION_KEY`.
 
-| Deal ID | Status | Description | Demo Purpose |
-|---------|--------|-------------|--------------|
-| #1 | `Created` | Awaiting fund lock (22 hours left) | Show creation flow and 24hr deadline |
-| #2 | `FundsLocked` | Ready to ship | Show "Mark Shipped" action |
-| #3 | `Shipped` | In transit | Show "Mark Delivered" action |
-| #4 | `Delivered` | Auto-releases in 5 minutes | Show 3hr dispute window and auto-release |
-| #5 | `Disputed` | Ready for admin resolution | Show Admin Portal arbitration |
+| Status | Description | Demo Purpose |
+|--------|-------------|--------------|
+| `Created` | Awaiting fund lock | Creation flow / 24h deadline |
+| `FundsLocked` | Ready to ship | Mark Shipped |
+| `Shipped` | In transit | Mark Delivered |
+| `Delivered` | Near auto-release | On **local Hardhat**, time is warped so ~5 min remain; on Amoy the full ~3h window applies |
+| `Disputed` | Ready for admin | Admin Portal arbitration |
+
+Deal IDs are whatever `nextDealId` issues on your deployed Escrow (not hard-coded #1–#5).
+
+**Simulator tip:** enter the E.164 phones above, or local `0788100001` form — USSD normalizes to `+250…`.
 
 ---
 
@@ -40,10 +44,12 @@ The seed script creates 5 deals in various states to demonstrate all system feat
 
 ### Prerequisites
 ```bash
+# Contracts must already be deployed; backend/.env must include addresses + keys.
+
 # Terminal 1: Backend
 cd backend
-npm run reset:demo
-npm run seed:demo
+npm run reset:demo   # clears demo rows from DB (not the chain)
+npm run seed:demo    # mints eRWF, creates on-chain deals in all states
 npm run start:dev
 
 # Terminal 2: USSD Service
@@ -54,6 +60,8 @@ npm start
 cd admin-portal
 npm run dev
 ```
+
+**Note:** `seed:demo` wipes previous demo users/deals in the DB first. On-chain history remains unless you use a fresh local node + redeploy.
 
 **Access URLs:**
 - USSD Simulator: http://localhost:4000
@@ -276,7 +284,7 @@ npm run seed:demo
 **Cause:** User wallet has no eRWF tokens  
 **Fix:**
 ```bash
-# Seed script mints tokens automatically
+# Seed script mints eRWF to buyers and creates on-chain deals (requires live RPC + deployed contracts)
 # Or manually mint via backend API:
 POST http://localhost:3000/users/:phone/balance
 { "amount": "1000" }
