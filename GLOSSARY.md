@@ -29,9 +29,9 @@ Plain-language definitions for the Escrow Vault prototype. Technical terms map t
 | **Event listener** | Backend process that watches blockchain events and updates the database + notification inbox. |
 | **Action log / timeline** | Chronological audit of who did what on a deal (shown in the admin portal). |
 | **Gas** | Network fee to write to the blockchain; users don’t pay it in this design—the relay does. |
-| **Hardhat** | Local blockchain used for development demos (chain ID `31337`). |
-| **Amoy** | Polygon’s public test network used for remote testing. |
-| **Seed / reset demo** | Scripts that load (`seed:demo`) or clear (`reset:demo` / `reset:demo:full`) a known demo state. |
+| **Hardhat** | Tooling for compiling/testing contracts and deploying to Amoy (`npx hardhat … --network amoy`). |
+| **Amoy** | Polygon’s public test network (chain ID `80002`) — the target for this prototype. |
+| **Seed / reset demo** | `seed:demo` loads a known demo state on Amoy; `reset:demo` clears demo phones from the DB only (chain history cannot be wiped). |
 
 For product limits and production follow-ons, see [LIMITATIONS.md](LIMITATIONS.md).  
 For why these choices were made, see [DECISIONS.md](DECISIONS.md).

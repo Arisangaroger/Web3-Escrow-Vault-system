@@ -76,34 +76,33 @@ git clone <repository-url>
 cd "Escrow Vault"
 ```
 
-### 2. Blockchain (local Hardhat)
+### 2. Blockchain (Polygon Amoy)
 ```bash
 cd blockchain
 npm install
-cp .env.example .env   # if present
-# Terminal A — local chain
-npx hardhat node
-# Terminal B — deploy (leave node running)
-npx hardhat run scripts/deploy.js --network localhost
-# Copy Escrow + eRWF addresses from deployments/localhost-latest.json
+cp .env.example .env   # PRIVATE_KEY with Amoy MATIC; optional POLYGONSCAN_API_KEY
+# Get test MATIC: https://faucet.polygon.technology/ (Amoy)
+npx hardhat run scripts/deploy.js --network amoy
+# Copy Escrow + eRWF addresses from the deploy output / deployments artifact
 ```
-Details: [`blockchain/CONTRACTS.md`](blockchain/CONTRACTS.md) / [`blockchain/README.md`](blockchain/README.md)
+Details: [`blockchain/CONTRACTS.md`](blockchain/CONTRACTS.md)
 
 ### 3. Backend
 ```bash
 cd backend
 npm install
 cp .env.example .env
-# Set DATABASE_URL, RPC_URL=http://127.0.0.1:8545, CHAIN_ID=31337,
+# Set DATABASE_URL, RPC_URL (Amoy), CHAIN_ID=80002,
 # ESCROW_CONTRACT_ADDRESS, ERWF_CONTRACT_ADDRESS,
-# TREASURY_PRIVATE_KEY (Hardhat account #0), ENCRYPTION_KEY, PIN_PEPPER, JWT_SECRET
+# TREASURY_PRIVATE_KEY (must hold Escrow ADMIN_ROLE + Amoy MATIC),
+# ENCRYPTION_KEY, PIN_PEPPER, JWT_SECRET
 npx prisma migrate deploy
-npm run sync:abis          # after every Fresh deploy
-npm run reset:demo:full    # optional: redeploy contracts + clear demo DB
-npm run seed:demo          # mints eRWF + on-chain deals in all states
+npm run sync:abis
+npm run reset:demo         # clear demo DB rows (Amoy history unchanged)
+npm run seed:demo          # mint eRWF + create deals on Amoy
 npm run start:dev
 ```
-API reference: [`backend/API.md`](backend/API.md) · architecture: [`backend/ARCHITECTURE.md`](backend/ARCHITECTURE.md)
+API reference: [`backend/API.md`](backend/API.md)
 
 ### 4. USSD service
 ```bash
@@ -182,23 +181,20 @@ Decisions log: [`DECISIONS.md`](DECISIONS.md)
 
 ## 📚 Documentation
 
-### Phase-Specific Docs
-- **[Phase 1: Smart Contracts](blockchain/README.md)** - Solidity contracts, deployment, testing
-- **[Phase 2: Backend](backend/README.md)** - NestJS API, custodial wallets, meta-transactions
-- **[Phase 3: USSD](ussd-service/README.md)** - Menu tree, session management, protocol
-- **[Phase 4: Admin Portal](ADMIN_PORTAL.md)** - Dispute resolution, authentication, timeline
+Phase 5 presentable set (see [`phase5_polish_demo_readiness_plan.md`](phase5_polish_demo_readiness_plan.md)):
 
-### System Docs
-- **[Architecture](backend/ARCHITECTURE.md)** - System design, data flow, services
-- **[API Documentation](backend/API.md)** - Endpoints, request/response formats
-- **[Limitations](LIMITATIONS.md)** - Known constraints, design trade-offs
-- **[Decisions Log](DECISIONS.md)** - Technical decisions and rationale
-
-### Setup & Operations
-- **[Demo Credentials](DEMO_CREDENTIALS.md)** - Test accounts, PINs, and walkthrough scripts
-- **[Demo Rehearsal](DEMO_REHEARSAL.md)** - Narrative arc, dry-run checklist, and rehearsal log
-- **[Glossary](GLOSSARY.md)** - Plain-language terms for non-technical reviewers
-- **[Demo Walkthrough](DEMO_CREDENTIALS.md#demo-walkthrough-1-happy-path-end-to-end)** - Step-by-step demo scenarios
+| Doc | Purpose |
+|-----|---------|
+| [`blockchain/CONTRACTS.md`](blockchain/CONTRACTS.md) | Escrow + eRWF, Amoy deploy, tests |
+| [`backend/API.md`](backend/API.md) | HTTP API |
+| [`ussd-service/USSD_PROTOCOL.md`](ussd-service/USSD_PROTOCOL.md) | CON/END protocol |
+| [`ussd-service/MENU_TREE.md`](ussd-service/MENU_TREE.md) | USSD menu map |
+| [`ADMIN_PORTAL.md`](ADMIN_PORTAL.md) | Dispute portal |
+| [`LIMITATIONS.md`](LIMITATIONS.md) | Scoped deferrals |
+| [`DECISIONS.md`](DECISIONS.md) | Design rationale |
+| [`GLOSSARY.md`](GLOSSARY.md) | Plain-language terms |
+| [`DEMO_CREDENTIALS.md`](DEMO_CREDENTIALS.md) | Demo users, PINs, walkthroughs |
+| [`DEMO_REHEARSAL.md`](DEMO_REHEARSAL.md) | Narrative + dry-run log |
 
 ---
 

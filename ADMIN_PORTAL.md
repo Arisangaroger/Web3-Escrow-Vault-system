@@ -179,7 +179,7 @@ TREASURY_PRIVATE_KEY="0xRELAY_WALLET_KEY"
 npx hardhat run scripts/grant-admin-role.js --network amoy
 ```
 
-**See:** `ADMIN_META_TRANSACTION_EXPLANATION.md` for background; current code resolves disputes via the relay wallet.
+**See:** [DECISIONS.md](DECISIONS.md) (admin / relay model); disputes resolve via the treasury/relay wallet that holds `ADMIN_ROLE`.
 
 ---
 
@@ -609,11 +609,11 @@ Phase 4 is complete when:
 
 ## Related Documentation
 
-- `phase4_admin_arbitration_portal_plan.md` - Full specification
-- `PHASE4_IMPLEMENTATION_PLAN.md` - Implementation roadmap
-- `backend/ARCHITECTURE.md` - System architecture
-- `backend/API.md` - API documentation
-- `AUTHENTICATION_UPDATE_SUMMARY.md` - PIN authentication details
+- [README.md](README.md) — setup and doc index
+- [backend/API.md](backend/API.md) — HTTP API including admin routes
+- [DECISIONS.md](DECISIONS.md) — design rationale
+- [DEMO_CREDENTIALS.md](DEMO_CREDENTIALS.md) — demo accounts and walkthroughs
+- [LIMITATIONS.md](LIMITATIONS.md) — scoped deferrals
 
 ---
 

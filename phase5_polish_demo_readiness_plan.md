@@ -44,7 +44,7 @@ Build a script (`scripts/seedDemo.js` or similar) that:
 - Mints sufficient eRWF balances to the demo buyer accounts so fund-locking doesn't fail on a live demo due to insufficient balance.
 
 ### 2.3 Reset script
-- A companion `scripts/resetDemo.js` that clears all demo data (or spins up a fresh local/testnet deployment) so you can return to a clean state after a demo or testing session without stale data confusing future runs.
+- A companion `scripts/resetDemo.ts` that clears demo users/deals from Postgres so you can return to a clean app state after a demo. On Polygon Amoy, on-chain history is not wiped; re-run `seed:demo` to create fresh deals on the same contracts.
 
 **Exit criteria for Section 2:** running the seed script once produces a complete, ready-to-demonstrate environment covering every major system state, and the reset script reliably returns to a clean baseline.
 

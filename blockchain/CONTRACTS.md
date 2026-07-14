@@ -169,47 +169,23 @@ Generate coverage report:
 npx hardhat coverage
 ```
 
-## Deployment
+## Deployment (Polygon Amoy)
 
-Deploy to local network:
 ```bash
-npx hardhat run scripts/deploy.js
+# blockchain/.env: PRIVATE_KEY with Amoy MATIC
+npx hardhat run scripts/deploy.js --network amoy
 ```
 
-Deploy to Fuji testnet:
+Copy Escrow + eRWF addresses into `backend/.env` (`CHAIN_ID=80002`, Amoy `RPC_URL`).
+
+Unit tests (local Hardhat network, not Amoy):
 ```bash
-npx hardhat run scripts/deploy.js --network fuji
+npx hardhat test
+REPORT_GAS=true npx hardhat test
+npx hardhat coverage
 ```
 
-Deploy to Sepolia testnet:
+Verify on PolygonScan Amoy after deploy (optional):
 ```bash
-npx hardhat run scripts/deploy.js --network sepolia
-```
-
-## Known Limitations (Prototype Stage)
-
-1. No phone number validation (contract only knows wallet addresses)
-2. No KYC/identity verification at contract level
-3. Keeper functions are permissionless (anyone can trigger timers)
-4. Single admin role (no multi-tenant arbitration)
-5. No upgrade mechanism (would require proxy pattern for production)
-6. Gas costs borne by backend relay (acceptable for prototype, needs economic model for production)
-
-## Future Production Considerations
-
-1. **CBDC Integration**: Replace eRWF with actual BNR programmable e-Franc
-2. **Identity Bridge**: Map phone numbers to wallet addresses in backend, not contract
-3. **Upgrade Pattern**: Implement proxy pattern for contract upgrades
-4. **Multi-tenant Admin**: Consider per-deal or per-cooperative arbitrator assignment
-5. **Pausability**: Already implemented for emergency stops
-6. **Gas Optimization**: Current implementation prioritizes clarity; optimize for scale
-7. **MEV Protection**: Consider if direct user transactions ever added
-
-## Verification
-
-After testnet deployment, verify contracts:
-
-```bash
-npx hardhat verify --network fuji <TOKEN_ADDRESS> <ADMIN_ADDRESS>
-npx hardhat verify --network fuji <ESCROW_ADDRESS> <TOKEN_ADDRESS> <ADMIN_ADDRESS>
+npx hardhat run scripts/verify-contracts.js --network amoy
 ```

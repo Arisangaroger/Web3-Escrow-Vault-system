@@ -15,7 +15,6 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed:demo": "ts-node scripts/seedDemo.ts",
     "reset:demo": "ts-node scripts/resetDemo.ts",
-    "reset:demo:full": "ts-node scripts/resetDemo.ts --full",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",

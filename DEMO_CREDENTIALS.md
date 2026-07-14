@@ -34,7 +34,7 @@ After running `npm run seed:demo` in the `backend` folder:
 | `Created` | Awaiting fund lock | Creation flow / 24h deadline |
 | `FundsLocked` | Ready to ship | Mark Shipped |
 | `Shipped` | In transit | Mark Delivered |
-| `Delivered` | Near auto-release | On **local Hardhat**, time is warped so ~5 min remain; on Amoy the full ~3h window applies |
+| `Delivered` | Dispute window open | Full ~3h window on Amoy (keeper auto-releases after) |
 | `Disputed` | Ready for admin | Admin Portal arbitration |
 
 Deal IDs are whatever `nextDealId` issues on your deployed Escrow (not hard-coded #1–#5).
@@ -64,8 +64,7 @@ cd admin-portal
 npm run dev
 ```
 
-**Note:** `seed:demo` wipes previous demo users/deals in the DB first.  
-For a **clean on-chain escrow** as well (local Hardhat): `npm run reset:demo:full` (node must be running), then `npm run seed:demo`. On Amoy, full reset redeploys to new addresses rather than wiping history.
+**Note:** `seed:demo` wipes previous demo users/deals in the DB first, then creates **new** deals on your existing Amoy Escrow. Old Amoy deals remain on-chain but are unused by the app. There is no chain wipe — use `reset:demo` (DB only) between rehearsal runs.
 
 **Access URLs:**
 - USSD Simulator: http://localhost:4000

@@ -1,13 +1,13 @@
 /**
- * Demo seed: creates users (ENCRYPTION_KEY wallets + PINs), mints eRWF to buyers,
- * and drives real on-chain deals into Created / FundsLocked / Shipped / Delivered / Disputed.
+ * Demo seed (Polygon Amoy): creates users (ENCRYPTION_KEY wallets + PINs),
+ * mints eRWF to buyers, and drives real on-chain deals into
+ * Created / FundsLocked / Shipped / Delivered / Disputed.
  *
- * Prerequisites: local node or Amoy with deployed Escrow + eRWF, backend `.env` filled.
+ * Prerequisites: Amoy Escrow + eRWF deployed; backend/.env filled (CHAIN_ID=80002).
  * Prefer: npm run reset:demo && npm run seed:demo
  */
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
-import { ethers } from 'ethers';
 import { DealStatus } from '@prisma/client';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/modules/db/prisma.service';
@@ -15,7 +15,6 @@ import { WalletsService } from '../src/modules/wallets/wallets.service';
 import { AuthService } from '../src/modules/auth/auth.service';
 import { DealsService } from '../src/modules/services/deals.service';
 import { ContractsService } from '../src/modules/contracts/contracts.service';
-import { GasRelayService } from '../src/modules/contracts/gas-relay.service';
 
 const DEMO_USERS = [
   {
@@ -105,27 +104,8 @@ async function setStatus(
   });
 }
 
-async function maybeWarpDisputeWindow(
-  gasRelay: GasRelayService,
-  chainId: number,
-) {
-  // Leave ~5 minutes before payoutReadyTime on local Hardhat only
-  if (chainId !== 31337 && chainId !== 1337) {
-    console.log(
-      '  ⚠️  Non-local chain: cannot time-warp. Delivered demo deal keeps the full ~3h dispute window.',
-    );
-    return;
-  }
-
-  const provider = gasRelay.getProvider() as ethers.JsonRpcProvider;
-  const warpSeconds = 3 * 60 * 60 - 5 * 60; // 2h55m
-  await provider.send('evm_increaseTime', [warpSeconds]);
-  await provider.send('evm_mine', []);
-  console.log('  ⏱  Hardhat time advanced (~2h55m) so Delivered deal is ~5 min from release');
-}
-
 async function main() {
-  console.log('🌱 Seeding demo data (on-chain + DB)...\n');
+  console.log('🌱 Seeding demo data on Amoy (on-chain + DB)...\n');
 
   const required = [
     'DATABASE_URL',
@@ -151,8 +131,13 @@ async function main() {
   const auth = app.get(AuthService);
   const deals = app.get(DealsService);
   const contracts = app.get(ContractsService);
-  const gasRelay = app.get(GasRelayService);
   const chainId = contracts.getChainId();
+
+  if (chainId !== 80002) {
+    console.warn(
+      `  ⚠️  CHAIN_ID=${chainId} (expected 80002 Amoy). Continuing with configured network.\n`,
+    );
+  }
 
   try {
     console.log('Clearing previous demo users/deals...');
@@ -231,7 +216,7 @@ async function main() {
     await logAction(prisma, c.dealId, DEMO_USERS[0].phone, 'MarkedShipped', cShip);
     console.log(`  ✅ Deal #${c.dealId}: Shipped (in transit)`);
 
-    // --- Deal D: Delivered (near auto-release on local) ---
+    // --- Deal D: Delivered (~3h dispute window on Amoy) ---
     const d = await deals.createDeal(
       DEMO_USERS[3].phone,
       DEMO_USERS[2].phone,
@@ -259,14 +244,12 @@ async function main() {
       DEMO_USERS[2].pin,
     );
 
-    await maybeWarpDisputeWindow(gasRelay, chainId);
-
     const onChain = await contracts.getDealFromChain(d.dealId);
     const payoutReadyTime = new Date(Number(onChain.payoutReadyTime) * 1000);
     await setStatus(prisma, d.dealId, DealStatus.Delivered, { payoutReadyTime });
     await logAction(prisma, d.dealId, DEMO_USERS[2].phone, 'MarkedDelivered', dDel);
     console.log(
-      `  ✅ Deal #${d.dealId}: Delivered (payoutReadyTime=${payoutReadyTime.toISOString()})`,
+      `  ✅ Deal #${d.dealId}: Delivered (~3h dispute window; payoutReadyTime=${payoutReadyTime.toISOString()})`,
     );
 
     // --- Deal E: Disputed (admin portal) ---
