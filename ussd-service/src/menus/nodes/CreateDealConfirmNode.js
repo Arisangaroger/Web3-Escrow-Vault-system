@@ -1,3 +1,4 @@
+const log = require('../../utils/logger');
 const MenuNode = require('../MenuNode');
 const { isValidChoice, isValidPin, formatPhoneForDisplay } = require('../../utils/validators');
 
@@ -79,11 +80,11 @@ class CreateDealConfirmNode extends MenuNode {
         )
         .then((result) => {
           if (!result?.success) {
-            console.error('Background createDeal failed:', result?.error || result);
+            log.error('Background createDeal failed', { error: result?.error || result });
           }
         })
         .catch((error) => {
-          console.error('Background createDeal error:', error.message);
+          log.error('Menu error', error);
         });
 
       sessionStore.clearContext(session.sessionId);
@@ -95,7 +96,7 @@ class CreateDealConfirmNode extends MenuNode {
         ),
       };
     } catch (error) {
-      console.error('Deal creation error:', error.message);
+      log.error('Menu error', error);
       return {
         nextNode: null,
         message: this.end('System error. Please try again later.'),

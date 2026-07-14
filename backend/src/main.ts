@@ -3,20 +3,24 @@ import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
+import { LoggerService } from './common/logger.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn', 'log'],
+  });
+  const bootLog = new LoggerService('Bootstrap');
 
   app.use(cookieParser());
 
-  // Enable validation pipes
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    transform: true,
-  }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
 
-  // CORS for admin portal + local tools
   app.enableCors({
     origin: true,
     credentials: true,
@@ -26,9 +30,11 @@ async function bootstrap() {
   const port = configService.get('PORT') || 3000;
 
   await app.listen(port);
-  console.log(`🚀 Escrow Backend running on port ${port}`);
-  console.log(`📦 Environment: ${configService.get('NODE_ENV')}`);
-  console.log(`⛓️  Chain ID: ${configService.get('CHAIN_ID')}`);
+  bootLog.info('Escrow Backend running', {
+    port,
+    env: configService.get('NODE_ENV'),
+    chainId: configService.get('CHAIN_ID'),
+  });
 }
 
 bootstrap();

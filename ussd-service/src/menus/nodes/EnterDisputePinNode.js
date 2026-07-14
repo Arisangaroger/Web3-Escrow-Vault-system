@@ -1,3 +1,4 @@
+const log = require('../../utils/logger');
 const MenuNode = require('../MenuNode');
 const { isValidPin } = require('../../utils/validators');
 const { getDisputeReasonText } = require('../../utils/menuHelpers');
@@ -47,11 +48,11 @@ class EnterDisputePinNode extends MenuNode {
         .revokeDeal(phoneNumber, dealId, reasonCode, pin)
         .then((result) => {
           if (!result?.success) {
-            console.error('Background revoke failed:', result?.error || result);
+            log.error('Background revoke failed', { error: result?.error || result });
           }
         })
         .catch((error) => {
-          console.error('Background revoke error:', error.message);
+          log.error('Menu error', error);
         });
 
       sessionStore.clearContext(session.sessionId);
@@ -63,7 +64,7 @@ class EnterDisputePinNode extends MenuNode {
         ),
       };
     } catch (error) {
-      console.error('Dispute error:', error.message);
+      log.error('Menu error', error);
       return {
         nextNode: null,
         message: this.end('System error. Please try again later.'),

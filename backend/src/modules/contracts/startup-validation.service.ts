@@ -1,6 +1,7 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ContractsService } from '../contracts/contracts.service';
+import { LoggerService } from '../../common/logger.service';
 
 const REQUIRED_ENV = [
   'DATABASE_URL',
@@ -18,7 +19,7 @@ const REQUIRED_ENV = [
  */
 @Injectable()
 export class StartupValidationService implements OnModuleInit {
-  private readonly logger = new Logger(StartupValidationService.name);
+  private readonly logger = new LoggerService(StartupValidationService.name);
 
   constructor(
     private configService: ConfigService,

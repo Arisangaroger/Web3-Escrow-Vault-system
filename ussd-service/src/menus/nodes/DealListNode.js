@@ -1,3 +1,4 @@
+const log = require('../../utils/logger');
 const MenuNode = require('../MenuNode');
 const { isValidChoice, isNumeric } = require('../../utils/validators');
 
@@ -44,7 +45,7 @@ class DealListNode extends MenuNode {
 
       return this.con(menu);
     } catch (error) {
-      console.error('Error fetching deals:', error.message);
+      log.error('Menu error', error);
       return this.con('System error loading deals.\n0. Back to Main Menu');
     }
   }

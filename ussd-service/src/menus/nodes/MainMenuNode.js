@@ -1,3 +1,4 @@
+const log = require('../../utils/logger');
 const MenuNode = require('../MenuNode');
 const { isValidChoice } = require('../../utils/validators');
 
@@ -29,7 +30,7 @@ class MainMenuNode extends MenuNode {
         );
       }
     } catch (error) {
-      console.error('Error fetching deal counts:', error.message);
+      log.error('Menu error', error);
     }
 
     // Fallback without counts

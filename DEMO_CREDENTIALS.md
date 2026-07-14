@@ -20,6 +20,9 @@ After running `npm run seed:demo` in the `backend` folder:
 - Email: `admin@escrow.local`
 - Password: `admin123` ⚠️ **Change in production!**
 
+**Before presenting:** follow [DEMO_REHEARSAL.md](DEMO_REHEARSAL.md) (environment checklist + dry-run log).  
+**Non-technical terms:** [GLOSSARY.md](GLOSSARY.md).
+
 ---
 
 ## Demo Deal States (After Seed)
@@ -61,7 +64,8 @@ cd admin-portal
 npm run dev
 ```
 
-**Note:** `seed:demo` wipes previous demo users/deals in the DB first. On-chain history remains unless you use a fresh local node + redeploy.
+**Note:** `seed:demo` wipes previous demo users/deals in the DB first.  
+For a **clean on-chain escrow** as well (local Hardhat): `npm run reset:demo:full` (node must be running), then `npm run seed:demo`. On Amoy, full reset redeploys to new addresses rather than wiping history.
 
 **Access URLs:**
 - USSD Simulator: http://localhost:4000

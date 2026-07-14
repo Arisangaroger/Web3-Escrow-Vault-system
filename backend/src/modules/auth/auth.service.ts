@@ -1,11 +1,12 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../db/prisma.service';
+import { LoggerService } from '../../common/logger.service';
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
+  private readonly logger = new LoggerService(AuthService.name);
   private readonly pinPepper: string;
   private readonly MAX_ATTEMPTS = 5;
   private readonly LOCKOUT_MINUTES = 15;

@@ -63,50 +63,79 @@ This system enables small-scale farmers in rural Rwanda to safely trade with urb
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (clean clone)
 
 ### Prerequisites
 - Node.js 18+
 - PostgreSQL 14+
 - Git
 
-### 1. Clone Repository
+### 1. Clone
 ```bash
 git clone <repository-url>
-cd escrow-vault
+cd "Escrow Vault"
 ```
 
-### 2. Setup Backend
+### 2. Blockchain (local Hardhat)
+```bash
+cd blockchain
+npm install
+cp .env.example .env   # if present
+# Terminal A — local chain
+npx hardhat node
+# Terminal B — deploy (leave node running)
+npx hardhat run scripts/deploy.js --network localhost
+# Copy Escrow + eRWF addresses from deployments/localhost-latest.json
+```
+Details: [`blockchain/CONTRACTS.md`](blockchain/CONTRACTS.md) / [`blockchain/README.md`](blockchain/README.md)
+
+### 3. Backend
 ```bash
 cd backend
 npm install
 cp .env.example .env
-# Edit .env with your database and blockchain config
-npx prisma migrate dev
-npm run seed:demo
+# Set DATABASE_URL, RPC_URL=http://127.0.0.1:8545, CHAIN_ID=31337,
+# ESCROW_CONTRACT_ADDRESS, ERWF_CONTRACT_ADDRESS,
+# TREASURY_PRIVATE_KEY (Hardhat account #0), ENCRYPTION_KEY, PIN_PEPPER, JWT_SECRET
+npx prisma migrate deploy
+npm run sync:abis          # after every Fresh deploy
+npm run reset:demo:full    # optional: redeploy contracts + clear demo DB
+npm run seed:demo          # mints eRWF + on-chain deals in all states
 npm run start:dev
 ```
+API reference: [`backend/API.md`](backend/API.md) · architecture: [`backend/ARCHITECTURE.md`](backend/ARCHITECTURE.md)
 
-### 3. Setup USSD Service
+### 4. USSD service
 ```bash
 cd ussd-service
 npm install
 cp .env.example .env
 npm start
+# Simulator UI: open ussd-service/simulator-ui/index.html
+# Default SIMs match seed: 0788100001 / 0788300003 / 0788200002
 ```
+Protocol & menus: [`ussd-service/USSD_PROTOCOL.md`](ussd-service/USSD_PROTOCOL.md), [`ussd-service/MENU_TREE.md`](ussd-service/MENU_TREE.md)
 
-### 4. Setup Admin Portal
+### 5. Admin portal
 ```bash
 cd admin-portal
 npm install
+cp .env.example .env   # VITE_API_URL=http://localhost:3000
 npm run dev
 ```
+Docs: [`ADMIN_PORTAL.md`](ADMIN_PORTAL.md)
 
-### 5. Access System
-- **USSD Simulator:** http://localhost:4000
-- **Admin Portal:** http://localhost:5000
+### 6. Access
+- **USSD Simulator:** open `ussd-service/simulator-ui/index.html` (API on :4000)
+- **Admin Portal:** http://localhost:5173 (or Vite port printed in terminal)
 - **Backend API:** http://localhost:3000
-- **Status Page:** http://localhost:3000/internal/status
+- **Status:** http://localhost:3000/internal/status
+
+Demo users / walkthrough: [`DEMO_CREDENTIALS.md`](DEMO_CREDENTIALS.md)  
+Demo rehearsal checklist: [`DEMO_REHEARSAL.md`](DEMO_REHEARSAL.md)  
+Glossary: [`GLOSSARY.md`](GLOSSARY.md)  
+Known limits: [`LIMITATIONS.md`](LIMITATIONS.md)  
+Decisions log: [`DECISIONS.md`](DECISIONS.md)
 
 ---
 
@@ -167,6 +196,8 @@ npm run dev
 
 ### Setup & Operations
 - **[Demo Credentials](DEMO_CREDENTIALS.md)** - Test accounts, PINs, and walkthrough scripts
+- **[Demo Rehearsal](DEMO_REHEARSAL.md)** - Narrative arc, dry-run checklist, and rehearsal log
+- **[Glossary](GLOSSARY.md)** - Plain-language terms for non-technical reviewers
 - **[Demo Walkthrough](DEMO_CREDENTIALS.md#demo-walkthrough-1-happy-path-end-to-end)** - Step-by-step demo scenarios
 
 ---

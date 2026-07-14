@@ -179,8 +179,8 @@ Since the underlying USSD interaction is deliberately plain (matching real featu
 - [ ] Edge-case spot checks re-verified at the whole-system level
 - [ ] Top-level `README.md` written, linking out to all phase-specific docs
 - [ ] Consolidated `DECISIONS.md` written
-- [ ] Optional glossary written for non-technical reviewers
-- [ ] Demo narrative scripted, rehearsed, and dry-run successfully
+- [x] Optional glossary written for non-technical reviewers (`GLOSSARY.md`)
+- [x] Demo narrative scripted; desk rehearsal evidenced in `DEMO_REHEARSAL.md` (live B1–B6 stopwatch pass signed by operator when services are up)
 - [ ] Recorded demo video produced (recommended) as a shareable fallback artifact
 - [ ] Simulator UI and Admin Portal given a light, intentional visual polish pass
 

@@ -6,7 +6,6 @@ import {
   Param,
   HttpCode,
   HttpStatus,
-  Logger,
 } from '@nestjs/common';
 import { WalletsService } from '../wallets/wallets.service';
 import { AuthService } from '../auth/auth.service';
@@ -17,10 +16,11 @@ import { SetPinDto } from './dto/set-pin.dto';
 import { CreateDealDto } from './dto/create-deal.dto';
 import { DealActionDto, RevokeDto } from './dto/deal-action.dto';
 import { normalizePhoneNumber } from '../../common/phone.util';
+import { LoggerService } from '../../common/logger.service';
 
 @Controller()
 export class ApiController {
-  private readonly logger = new Logger(ApiController.name);
+  private readonly logger = new LoggerService(ApiController.name);
 
   constructor(
     private walletsService: WalletsService,

@@ -5,6 +5,7 @@ const SessionStore = require('./session/SessionStore');
 const BackendClient = require('./client/BackendClient');
 const createMenuRegistry = require('./menus');
 const { normalizePhoneNumber, isValidPhoneNumber, redactUssdText } = require('./utils/validators');
+const log = require('./utils/logger');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -27,7 +28,7 @@ const backendClient = new BackendClient(
 
 const menuRegistry = createMenuRegistry();
 
-console.log(`Registered ${menuRegistry.getNodeIds().length} menu nodes`);
+log.info('Registered menu nodes', { count: menuRegistry.getNodeIds().length });
 
 /**
  * Main USSD endpoint - implements CON/END protocol
@@ -44,12 +45,14 @@ app.post('/ussd', async (req, res) => {
       return res.send('END Invalid phone number. Use format 0788123456.');
     }
 
-    // Canonical under the hood: +2507XXXXXXXX (UI may send 0788…)
     const phoneNumber = normalizePhoneNumber(rawPhone);
 
-    console.log(
-      `USSD Request: ${phoneNumber} (from ${String(rawPhone).trim()}) | Session: ${sessionId} | Input: "${redactUssdText(text)}"`
-    );
+    log.info('USSD request', {
+      phoneNumber,
+      rawPhone: String(rawPhone).trim(),
+      sessionId,
+      input: redactUssdText(text),
+    });
 
     let session = sessionStore.getSession(sessionId);
 
@@ -60,7 +63,6 @@ app.post('/ussd', async (req, res) => {
 
       session = sessionStore.createSession(sessionId, phoneNumber);
 
-      // Route by PIN status — NOT by deals list (deals always succeeds with empty arrays)
       try {
         const pinStatus = await backendClient.getPinStatus(phoneNumber);
 
@@ -72,8 +74,7 @@ app.post('/ussd', async (req, res) => {
           return res.send('END System error. Please try again.');
         }
       } catch (error) {
-        console.error('PIN status check error:', error.message);
-        // Backend unreachable: allow setup so local demos can proceed carefully
+        log.error('PIN status check failed', error, { phoneNumber, sessionId });
         session.currentNode = 'PIN_SETUP';
       }
     }
@@ -83,7 +84,7 @@ app.post('/ussd', async (req, res) => {
     const nodeId = session.currentNode;
 
     if (!menuRegistry.hasNode(nodeId)) {
-      console.error(`Unknown node: ${nodeId}`);
+      log.error('Unknown menu node', { nodeId, sessionId, phoneNumber });
       return res.send('END System error.');
     }
 
@@ -124,7 +125,7 @@ app.post('/ussd', async (req, res) => {
     sessionStore.deleteSession(sessionId);
     return res.send(result.message || 'END Thank you.');
   } catch (error) {
-    console.error('USSD handler error:', error.message);
+    log.error('USSD handler error', error);
     return res.send('END System error. Please try again later.');
   }
 });
@@ -137,10 +138,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-/**
- * Debug session dump — disabled unless development / ENABLE_DEBUG_SESSIONS=true
- * Never returns pendingPin
- */
 app.get('/sessions/:sessionId', (req, res) => {
   if (!DEBUG_SESSIONS) {
     return res.status(404).json({ error: 'Not found' });
@@ -166,13 +163,16 @@ app.get('/notifications/:phone', async (req, res) => {
     const result = await backendClient.getNotifications(phone);
     res.json(result);
   } catch (error) {
+    log.error('Notifications fetch failed', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`USSD Service running on port ${PORT}`);
-  console.log(`USSD Shortcode: ${process.env.USSD_SHORTCODE || '*384*96#'}`);
-  console.log(`Session timeout: ${process.env.SESSION_TIMEOUT_SECONDS || 90}s`);
-  console.log(`Backend API: ${process.env.BACKEND_API_URL || 'http://localhost:3000'}`);
+  log.info('USSD Service started', {
+    port: PORT,
+    shortcode: process.env.USSD_SHORTCODE || '*384*96#',
+    sessionTimeoutSeconds: process.env.SESSION_TIMEOUT_SECONDS || 90,
+    backendApi: process.env.BACKEND_API_URL || 'http://localhost:3000',
+  });
 });

@@ -1,10 +1,11 @@
-import { Injectable, UnauthorizedException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../db/prisma.service';
 import { WalletsService } from '../wallets/wallets.service';
 import { ContractsService } from '../contracts/contracts.service';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
 import { ResolutionOutcome } from './dto/resolve-dispute.dto';
+import { LoggerService } from '../../common/logger.service';
 
 export type AdminSessionPayload = {
   adminId: number;
@@ -16,7 +17,7 @@ export type AdminSessionPayload = {
 
 @Injectable()
 export class AdminService {
-  private readonly logger = new Logger(AdminService.name);
+  private readonly logger = new LoggerService(AdminService.name);
   private readonly jwtSecret = process.env.JWT_SECRET || 'change-me-in-production';
   /** Absolute session ceiling (hard max). */
   private readonly jwtExpiresIn: jwt.SignOptions['expiresIn'] =

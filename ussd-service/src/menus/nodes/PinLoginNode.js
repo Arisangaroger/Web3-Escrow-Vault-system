@@ -1,3 +1,4 @@
+const log = require('../../utils/logger');
 const MenuNode = require('../MenuNode');
 const { isValidPin } = require('../../utils/validators');
 
@@ -55,7 +56,7 @@ class PinLoginNode extends MenuNode {
         };
       }
     } catch (error) {
-      console.error('PIN verification error:', error.message);
+      log.error('Menu error', error);
       
       // Network or system error
       return {

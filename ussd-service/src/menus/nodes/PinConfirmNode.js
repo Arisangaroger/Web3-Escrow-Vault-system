@@ -1,3 +1,4 @@
+const log = require('../../utils/logger');
 const MenuNode = require('../MenuNode');
 const { isValidPin } = require('../../utils/validators');
 
@@ -56,7 +57,7 @@ class PinConfirmNode extends MenuNode {
         };
       }
     } catch (error) {
-      console.error('PIN setup error:', error.message);
+      log.error('Menu error', error);
       return {
         nextNode: 'PIN_SETUP',
         message: this.con('System error. Please try again.\nSet your 4-digit PIN:'),

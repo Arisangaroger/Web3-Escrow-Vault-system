@@ -1,3 +1,4 @@
+const log = require('../../utils/logger');
 const MenuNode = require('../MenuNode');
 const { isValidPin } = require('../../utils/validators');
 
@@ -69,11 +70,11 @@ class EnterPinNode extends MenuNode {
       actionCall
         .then((result) => {
           if (!result?.success) {
-            console.error(`Background ${action} failed:`, result?.error || result);
+            log.error('Background action failed', { action, error: result?.error || result });
           }
         })
         .catch((error) => {
-          console.error(`Background ${action} error:`, error.message);
+          log.error('Background action error', error, { action });
         });
 
       sessionStore.clearContext(session.sessionId);
@@ -85,7 +86,7 @@ class EnterPinNode extends MenuNode {
         ),
       };
     } catch (error) {
-      console.error('Action execution error:', error.message);
+      log.error('Menu error', error);
       return {
         nextNode: null,
         message: this.end('System error. Please try again later.'),

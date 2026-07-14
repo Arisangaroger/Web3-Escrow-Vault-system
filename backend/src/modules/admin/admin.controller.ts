@@ -9,7 +9,6 @@ import {
   UseGuards,
   Req,
   Res,
-  Logger,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AdminService } from './admin.service';
@@ -17,10 +16,11 @@ import { LoginDto } from './dto/login.dto';
 import { ResolveDisputeDto } from './dto/resolve-dispute.dto';
 import { AdminAuthGuard } from '../../middleware/admin-auth.guard';
 import { Response } from 'express';
+import { LoggerService } from '../../common/logger.service';
 
 @Controller('admin')
 export class AdminController {
-  private readonly logger = new Logger(AdminController.name);
+  private readonly logger = new LoggerService(AdminController.name);
 
   constructor(private adminService: AdminService) {}
 

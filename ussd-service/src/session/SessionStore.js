@@ -2,6 +2,8 @@
  * In-memory session store with automatic timeout and cleanup
  * Tracks USSD session state across multiple request/response cycles
  */
+const log = require('../utils/logger');
+
 class SessionStore {
   constructor(timeoutSeconds = 90, cleanupIntervalMs = 60000) {
     this.sessions = new Map();
@@ -115,7 +117,7 @@ class SessionStore {
       }
 
       if (expiredCount > 0) {
-        console.log(`🧹 Cleaned up ${expiredCount} expired session(s)`);
+        log.info('Cleaned up expired sessions', { expiredCount });
       }
     }, this.cleanupIntervalMs);
   }

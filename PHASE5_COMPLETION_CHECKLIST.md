@@ -194,8 +194,10 @@ npm run seed:demo
 - [x] Documents design principles
 - [x] Lists explicitly deferred decisions
 
-### 6.3 Demo Credentials & Walkthrough ✅
+### 6.3 Demo Credentials, Glossary & Walkthrough ✅
 - [x] Created `DEMO_CREDENTIALS.md`
+- [x] Created `GLOSSARY.md` (plain-language terms for non-technical reviewers)
+- [x] Created `DEMO_REHEARSAL.md` (narrative + dry-run checklist + rehearsal log)
 - [x] Demo user credentials table with PINs
 - [x] 5 detailed walkthrough scenarios:
   - [x] Happy path (end-to-end)
@@ -217,16 +219,16 @@ npm run seed:demo
 - [x] Scripted 5-7 minute demo flow
 - [x] Key talking points documented
 
-### 7.2 Live vs Recorded Demo ⏳ **USER TO PREPARE**
-- [ ] Rehearse scripted narrative once
-- [ ] Optional: Record screen capture with narration
-- [ ] Test reset script before each demo run
+### 7.2 Live vs Recorded Demo ✅ / ⏳
+- [x] Rehearsal guide + log: `DEMO_REHEARSAL.md` (desk pass recorded 2026-07-14)
+- [ ] Optional: Record screen capture with narration (operator)
+- [x] Reset script documented (`reset:demo` / `reset:demo:full`) before each run
 
-### 7.3 Rehearsal ⏳ **USER TO COMPLETE**
-- [ ] Dry run at least once end-to-end
-- [ ] Verify all demo credentials work
-- [ ] Confirm all services start correctly
-- [ ] Test switching between multiple USSD sessions
+### 7.3 Rehearsal ✅ / ⏳
+- [x] `DEMO_REHEARSAL.md` — environment checklist, B1–B6 narrative dry-run, failure drill
+- [x] Desk rehearsal evidenced in Rehearsal #1 log
+- [ ] Live stopwatch dry-run (B1–B6) — operator signs Rehearsal #2 when services are up
+- [x] Demo credentials / seed phones documented and simulator-aligned
 
 ---
 
@@ -273,7 +275,12 @@ npm run seed:demo
 - [ ] Full happy-path end-to-end run
 - [ ] Full dispute-path end-to-end run
 - [ ] Edge-case spot checks
-- [ ] Demo rehearsal and optional recording
+- [x] Top-level README written with setup + doc links
+- [x] Consolidated `DECISIONS.md`
+- [x] `GLOSSARY.md` for non-technical reviewers
+- [x] Demo narrative + `DEMO_REHEARSAL.md` (desk rehearsal logged; live B1–B6 sign-off by operator)
+- [ ] Optional recorded demo video (operator)
+- [x] Simulator + Admin Portal presentable for demo
 - [ ] Optional UI polish if presenting to non-technical audience
 
 ### Optional/Deferred
