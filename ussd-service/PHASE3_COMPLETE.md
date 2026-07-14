@@ -38,4 +38,7 @@ cd ussd-service && npm start
 
 ## Phone +250 vs 07…
 
-Product decision: **use local `0788…` everywhere** in USSD and DB phone fields for this project. Inputs like `+250788…` are accepted on dial/entry but normalized to `0788…`.
+- **What users see / type:** local `0788111111`
+- **What USSD + backend store / lookup:** E.164 `+250788111111`
+
+Menus still prompt `0788…`. The USSD service and API normalize to `+250…` under the hood (simulator SIM fields stay `07…`).

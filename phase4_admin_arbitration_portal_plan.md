@@ -126,10 +126,10 @@ This is the most important screen in the portal — it needs to give the admin e
   11:20 — Buyer raised Dispute: "Driver Lying About Delivery"
   ```
   This is exactly the evidence that would, for example, prove a driver marked "Delivered" suspiciously early relative to a realistic travel time — the admin should be able to read this timeline and immediately spot that kind of red flag, per your original design intent.
-- **Resolution panel:** three clearly labeled buttons matching Phase 1's outcomes:
-  - "Driver Fraud — Refund Buyer"
-  - "Faulty Goods — Refund Buyer, Honor Transport"
-  - "False Buyer Claim — Force Payout to Farmer"
+- **Resolution panel:** three clearly labeled buttons matching Phase 1 presets (escrow only splits between **sender** and **receiver**; driver fee is always off-chain between farmer and transporter):
+  - "Driver Fraud — Refund Buyer" (100% to receiver)
+  - "Faulty Goods — Refund Buyer" (100% to receiver; same split as Driver Fraud — label records that goods, not the driver, caused the dispute)
+  - "False Buyer Claim — Force Payout to Farmer" (100% to sender)
 - Each button triggers a confirmation modal before submission (since this is an irreversible, fund-moving action) — e.g. "Are you sure? This will refund 500,000 RWF to the buyer and cannot be undone."
 
 ### 5.3 Guarding against acting on stale/incorrect data

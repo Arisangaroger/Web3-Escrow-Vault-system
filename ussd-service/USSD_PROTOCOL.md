@@ -204,7 +204,7 @@ Always validate `sessionId` exists and hasn't expired before processing.
 
 ### 2. Phone Number Validation
 
-Validate and normalize phone numbers to local 07XXXXXXXX.
+Validate and normalize phone numbers: accept `07XXXXXXXX` from the handset, store/lookup as `+2507XXXXXXXX`.
 
 ### 3. PIN Masking
 

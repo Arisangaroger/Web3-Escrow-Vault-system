@@ -15,7 +15,8 @@ import { ContractsService } from '../contracts/contracts.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SetPinDto } from './dto/set-pin.dto';
 import { CreateDealDto } from './dto/create-deal.dto';
-import { DealActionDto, RevokeDto, ResolveDisputeDto } from './dto/deal-action.dto';
+import { DealActionDto, RevokeDto } from './dto/deal-action.dto';
+import { normalizePhoneNumber } from '../../common/phone.util';
 
 @Controller()
 export class ApiController {
@@ -29,6 +30,10 @@ export class ApiController {
     private notificationsService: NotificationsService,
   ) {}
 
+  private phone(raw: string): string {
+    return normalizePhoneNumber(decodeURIComponent(raw));
+  }
+
   /**
    * Set PIN for first-time user
    * POST /users/:phone/pin
@@ -37,11 +42,9 @@ export class ApiController {
   @HttpCode(HttpStatus.OK)
   async setPin(@Param('phone') phone: string, @Body() dto: SetPinDto) {
     try {
-      // Ensure wallet exists
-      await this.walletsService.getOrCreateWallet(phone);
-      
-      // Set PIN
-      await this.authService.setPin(phone, dto.pin);
+      const normalized = this.phone(phone);
+      await this.walletsService.getOrCreateWallet(normalized);
+      await this.authService.setPin(normalized, dto.pin);
 
       return {
         success: true,
@@ -63,7 +66,7 @@ export class ApiController {
   @HttpCode(HttpStatus.OK)
   async verifyPin(@Param('phone') phone: string, @Body() dto: SetPinDto) {
     try {
-      const isValid = await this.authService.verifyPin(phone, dto.pin);
+      const isValid = await this.authService.verifyPin(this.phone(phone), dto.pin);
 
       if (isValid) {
         return {
@@ -93,9 +96,9 @@ export class ApiController {
   async createDeal(@Body() dto: CreateDealDto) {
     try {
       const result = await this.dealsService.createDeal(
-        dto.senderPhone,
-        dto.driverPhone,
-        dto.receiverPhone,
+        normalizePhoneNumber(dto.senderPhone),
+        normalizePhoneNumber(dto.driverPhone),
+        normalizePhoneNumber(dto.receiverPhone),
         dto.amount,
         dto.pin,
       );
@@ -122,7 +125,7 @@ export class ApiController {
   async lockFunds(@Param('dealId') dealId: string, @Body() dto: DealActionDto) {
     try {
       const txHash = await this.dealsService.lockFunds(
-        dto.phone,
+        normalizePhoneNumber(dto.phone),
         parseInt(dealId),
         dto.pin,
       );
@@ -149,7 +152,7 @@ export class ApiController {
   async markShipped(@Param('dealId') dealId: string, @Body() dto: DealActionDto) {
     try {
       const txHash = await this.dealsService.markShipped(
-        dto.phone,
+        normalizePhoneNumber(dto.phone),
         parseInt(dealId),
         dto.pin,
       );
@@ -176,7 +179,7 @@ export class ApiController {
   async markDelivered(@Param('dealId') dealId: string, @Body() dto: DealActionDto) {
     try {
       const txHash = await this.dealsService.markDelivered(
-        dto.phone,
+        normalizePhoneNumber(dto.phone),
         parseInt(dealId),
         dto.pin,
       );
@@ -203,7 +206,7 @@ export class ApiController {
   async revoke(@Param('dealId') dealId: string, @Body() dto: RevokeDto) {
     try {
       const txHash = await this.dealsService.revoke(
-        dto.phone,
+        normalizePhoneNumber(dto.phone),
         parseInt(dealId),
         dto.reasonCode,
         dto.pin,
@@ -231,7 +234,7 @@ export class ApiController {
   async cancelBeforeLock(@Param('dealId') dealId: string, @Body() dto: DealActionDto) {
     try {
       const txHash = await this.dealsService.cancelBeforeLock(
-        dto.phone,
+        normalizePhoneNumber(dto.phone),
         parseInt(dealId),
         dto.pin,
       );
@@ -256,7 +259,7 @@ export class ApiController {
   @Get('users/:phone/pin-status')
   async getPinStatus(@Param('phone') phone: string) {
     try {
-      const hasPin = await this.authService.hasPinSet(phone);
+      const hasPin = await this.authService.hasPinSet(this.phone(phone));
       return {
         success: true,
         data: { hasPin: Boolean(hasPin) },
@@ -277,7 +280,7 @@ export class ApiController {
   async getNotifications(@Param('phone') phone: string) {
     try {
       const notifications =
-        await this.notificationsService.getNotificationsForPhone(phone);
+        await this.notificationsService.getNotificationsForPhone(this.phone(phone));
       return {
         success: true,
         data: notifications,
@@ -298,7 +301,7 @@ export class ApiController {
   @Get('users/:phone/deals')
   async getActiveDeals(@Param('phone') phone: string) {
     try {
-      const deals = await this.dealsService.getActiveDealsForPhone(phone);
+      const deals = await this.dealsService.getActiveDealsForPhone(this.phone(phone));
 
       return {
         success: true,
@@ -336,36 +339,6 @@ export class ApiController {
   }
 
   /**
-   * Resolve dispute (admin only)
-   * POST /deals/:dealId/resolve
-   */
-  @Post('deals/:dealId/resolve')
-  @HttpCode(HttpStatus.OK)
-  async resolveDispute(
-    @Param('dealId') dealId: string,
-    @Body() dto: ResolveDisputeDto,
-  ) {
-    try {
-      const txHash = await this.contractsService.resolveDisputeOnChain(
-        parseInt(dealId),
-        dto.amountToSender,
-        dto.amountToReceiver,
-      );
-
-      return {
-        success: true,
-        data: { txHash },
-      };
-    } catch (error) {
-      this.logger.error(`Resolve dispute error: ${error.message}`);
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-  }
-
-  /**
    * Mint tokens (testing only - operator role required)
    * POST /test/mint
    */
@@ -375,7 +348,9 @@ export class ApiController {
     @Body() body: { phone: string; amount: string },
   ) {
     try {
-      const { address } = await this.walletsService.getOrCreateWallet(body.phone);
+      const { address } = await this.walletsService.getOrCreateWallet(
+        normalizePhoneNumber(body.phone),
+      );
       const txHash = await this.contractsService.mintTokens(address, body.amount);
 
       return {

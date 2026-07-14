@@ -518,6 +518,15 @@
       return 'sim_' + Date.now() + '_' + Math.random().toString(36).slice(2, 11);
     }
 
+    /** UI shows 0788…; APIs use +2507… under the hood */
+    function toCanonicalPhone(input) {
+      const cleaned = String(input || '').trim().replace(/[\s-]+/g, '');
+      if (/^07\d{8}$/.test(cleaned)) return '+250' + cleaned.slice(1);
+      if (/^\+2507\d{8}$/.test(cleaned)) return cleaned;
+      if (/^2507\d{8}$/.test(cleaned)) return '+' + cleaned;
+      return cleaned;
+    }
+
     function keypadHtml(phoneId) {
       const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
       return keys.map((digit) => `
@@ -579,6 +588,7 @@
         sessionId: null,
         text: '',
         phoneNumber: defaultNumber,
+        canonicalPhone: defaultNumber ? toCanonicalPhone(defaultNumber) : null,
       };
 
       if (defaultNumber) startSmsPolling(phoneId);
@@ -593,15 +603,17 @@
     }
 
     async function dial(phoneId) {
-      const phoneNumber = document.getElementById(`${phoneId}-number`).value.trim();
-      if (!phoneNumber) {
+      const displayPhone = document.getElementById(`${phoneId}-number`).value.trim();
+      if (!displayPhone) {
         updateStatus(phoneId, 'Enter a SIM number', 'error');
         return;
       }
 
+      const phoneNumber = toCanonicalPhone(displayPhone);
       phones[phoneId].sessionId = generateSessionId();
       phones[phoneId].text = '';
-      phones[phoneId].phoneNumber = phoneNumber;
+      phones[phoneId].phoneNumber = displayPhone;
+      phones[phoneId].canonicalPhone = phoneNumber;
       document.getElementById(`${phoneId}-input`).value = '';
 
       updateStatus(phoneId, 'Dialing shortcode…', 'active');
@@ -651,6 +663,12 @@
         ? `${phones[phoneId].text}*${input}`
         : input;
 
+      const displayPhone =
+        phones[phoneId].phoneNumber ||
+        document.getElementById(`${phoneId}-number`).value.trim();
+      const phoneNumber =
+        phones[phoneId].canonicalPhone || toCanonicalPhone(displayPhone);
+
       updateStatus(phoneId, 'Sending…', 'active');
 
       try {
@@ -659,7 +677,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             sessionId: phones[phoneId].sessionId,
-            phoneNumber: phones[phoneId].phoneNumber,
+            phoneNumber,
             text: phones[phoneId].text,
           }),
         });
@@ -717,10 +735,12 @@
     }
 
     async function fetchSms(phoneId) {
-      const phoneNumber = phones[phoneId]?.phoneNumber
+      const displayPhone = phones[phoneId]?.phoneNumber
         || document.getElementById(`${phoneId}-number`)?.value.trim();
-      if (!phoneNumber) return;
-      phones[phoneId].phoneNumber = phoneNumber;
+      if (!displayPhone) return;
+      phones[phoneId].phoneNumber = displayPhone;
+      const phoneNumber =
+        phones[phoneId].canonicalPhone || toCanonicalPhone(displayPhone);
 
       try {
         const response = await fetch(

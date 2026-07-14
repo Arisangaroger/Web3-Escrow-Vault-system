@@ -12,21 +12,23 @@ const ResolutionPanel = ({ dealId, onComplete }) => {
     {
       value: 'DRIVER_FRAUD',
       label: 'Driver Fraud',
-      description: 'Driver lied about delivery. Refund 100% to buyer.',
+      description:
+        'Driver lied about delivery. Refund 100% locked funds to buyer. (Driver pay is off-platform.)',
       color: 'red',
       icon: '🚫',
     },
     {
       value: 'FAULTY_GOODS',
       label: 'Faulty Goods',
-      description: 'Goods were defective. Refund 100% to buyer.',
+      description:
+        'Goods were defective (not driver fraud). Refund 100% to buyer — same escrow split; transport fee stays between farmer and driver outside this system.',
       color: 'orange',
       icon: '📦',
     },
     {
       value: 'FALSE_BUYER_CLAIM',
       label: 'False Buyer Claim',
-      description: 'Buyer lying. Pay 100% to farmer.',
+      description: 'Buyer claim rejected. Pay 100% locked funds to farmer.',
       color: 'blue',
       icon: '✓',
     },

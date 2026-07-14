@@ -1,11 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ethers } from 'ethers';
 import { PrismaService } from '../db/prisma.service';
+import { LoggerService } from '../../common/logger.service';
 
 @Injectable()
 export class WalletsService {
-  private readonly logger = new Logger(WalletsService.name);
+  private readonly logger = new LoggerService(WalletsService.name);
   private readonly encryptionKey: string;
 
   constructor(

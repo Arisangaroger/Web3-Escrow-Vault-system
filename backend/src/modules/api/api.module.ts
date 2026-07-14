@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ApiController } from './api.controller';
+import { StatusController } from './status.controller';
 import { WalletsModule } from '../wallets/wallets.module';
 import { AuthModule } from '../auth/auth.module';
 import { DealsModule } from '../services/deals.module';
@@ -14,6 +15,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
     ContractsModule,
     NotificationsModule,
   ],
-  controllers: [ApiController],
+  controllers: [ApiController, StatusController],
 })
 export class ApiModule {}

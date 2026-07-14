@@ -1,14 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ethers } from 'ethers';
 import { GasRelayService } from './gas-relay.service';
 import { SignatureService } from './signature.service';
 import * as EscrowArtifact from './abis/Escrow.json';
 import * as eRWFArtifact from './abis/eRWF.json';
+import { LoggerService } from '../../common/logger.service';
 
 @Injectable()
 export class ContractsService {
-  private readonly logger = new Logger(ContractsService.name);
+  private readonly logger = new LoggerService(ContractsService.name);
   private readonly escrowContract: ethers.Contract;
   private readonly eRWFContract: ethers.Contract;
   private readonly chainId: number;
@@ -38,12 +39,12 @@ export class ContractsService {
 
     // Dispute resolution uses the relay/treasury wallet. On deploy, that address
     // (or ADMIN_ADDRESS) receives ADMIN_ROLE — no separate admin key needed.
-    this.logger.log(`Escrow contract: ${escrowAddress}`);
-    this.logger.log(`eRWF contract: ${eRWFAddress}`);
-    this.logger.log(`Chain ID: ${this.chainId}`);
-    this.logger.log(
-      `ResolveDispute signer (relay): ${this.gasRelayService.getTreasuryWallet().address}`,
-    );
+    this.logger.info('Contracts initialized', {
+      escrowAddress,
+      eRWFAddress,
+      chainId: this.chainId,
+      relayWallet: this.gasRelayService.getTreasuryWallet().address,
+    });
   }
 
   /**
@@ -82,9 +83,11 @@ export class ContractsService {
       );
 
       const receipt = await tx.wait();
-      this.logger.log(
-        `Deal created by ${senderAddress} (relay: ${relayWallet.address}): ${receipt.hash}`,
-      );
+      this.logger.logTransaction('createDeal', receipt.hash, {
+        dealId: Number(nextDealId),
+        sender: senderAddress,
+        amount,
+      });
 
       return { txHash: receipt.hash, dealId: Number(nextDealId) };
     } catch (error) {
@@ -125,7 +128,10 @@ export class ContractsService {
       const tx = await this.escrowContract.connect(relayWallet).lockFunds(dealId, signature);
       const receipt = await tx.wait();
 
-      this.logger.log(`Funds locked for deal ${dealId} by ${receiverAddress}: ${receipt.hash}`);
+      this.logger.logTransaction('lockFunds', receipt.hash, {
+        dealId,
+        receiver: receiverAddress,
+      });
       return receipt.hash;
     } catch (error) {
       throw new Error(this.formatContractError('lockFunds', error));
@@ -153,7 +159,10 @@ export class ContractsService {
       const tx = await this.escrowContract.connect(relayWallet).markShipped(dealId, signature);
       const receipt = await tx.wait();
 
-      this.logger.log(`Marked shipped for deal ${dealId} by ${senderAddress}: ${receipt.hash}`);
+      this.logger.logTransaction('markShipped', receipt.hash, {
+        dealId,
+        sender: senderAddress,
+      });
       return receipt.hash;
     } catch (error) {
       throw new Error(this.formatContractError('markShipped', error));
@@ -181,7 +190,10 @@ export class ContractsService {
       const tx = await this.escrowContract.connect(relayWallet).markDelivered(dealId, signature);
       const receipt = await tx.wait();
 
-      this.logger.log(`Marked delivered for deal ${dealId} by ${driverAddress}: ${receipt.hash}`);
+      this.logger.logTransaction('markDelivered', receipt.hash, {
+        dealId,
+        driver: driverAddress,
+      });
       return receipt.hash;
     } catch (error) {
       throw new Error(this.formatContractError('markDelivered', error));
@@ -212,7 +224,11 @@ export class ContractsService {
         .revoke(dealId, reasonCode, userAddress, signature);
       const receipt = await tx.wait();
 
-      this.logger.log(`Deal ${dealId} revoked by ${userAddress}: ${receipt.hash}`);
+      this.logger.logTransaction('revoke', receipt.hash, {
+        dealId,
+        user: userAddress,
+        reasonCode,
+      });
       return receipt.hash;
     } catch (error) {
       throw new Error(this.formatContractError('revoke', error));
@@ -224,7 +240,7 @@ export class ContractsService {
       const treasuryWallet = this.gasRelayService.getTreasuryWallet();
       const tx = await this.escrowContract.connect(treasuryWallet).releaseFunds(dealId);
       const receipt = await tx.wait();
-      this.logger.log(`Funds released for deal ${dealId}: ${receipt.hash}`);
+      this.logger.logTransaction('releaseFunds', receipt.hash, { dealId });
       return receipt.hash;
     } catch (error) {
       throw new Error(this.formatContractError('releaseFunds', error));
@@ -236,7 +252,7 @@ export class ContractsService {
       const treasuryWallet = this.gasRelayService.getTreasuryWallet();
       const tx = await this.escrowContract.connect(treasuryWallet).autoCancelIfUnlocked(dealId);
       const receipt = await tx.wait();
-      this.logger.log(`Deal ${dealId} auto-cancelled: ${receipt.hash}`);
+      this.logger.logTransaction('autoCancel', receipt.hash, { dealId });
       return receipt.hash;
     } catch (error) {
       throw new Error(this.formatContractError('autoCancelIfUnlocked', error));
@@ -266,7 +282,10 @@ export class ContractsService {
         .cancelBeforeLock(dealId, userAddress, signature);
       const receipt = await tx.wait();
 
-      this.logger.log(`Deal ${dealId} cancelled by ${userAddress}: ${receipt.hash}`);
+      this.logger.logTransaction('cancelBeforeLock', receipt.hash, {
+        dealId,
+        user: userAddress,
+      });
       return receipt.hash;
     } catch (error) {
       throw new Error(this.formatContractError('cancelBeforeLock', error));
@@ -292,9 +311,12 @@ export class ContractsService {
         .resolveDispute(dealId, amountToSenderWei, amountToReceiverWei);
       const receipt = await tx.wait();
 
-      this.logger.log(
-        `Dispute resolved for deal ${dealId} by relay ${relayWallet.address}: ${receipt.hash}`,
-      );
+      this.logger.logTransaction('resolveDispute', receipt.hash, {
+        dealId,
+        amountToSender,
+        amountToReceiver,
+        admin: relayWallet.address,
+      });
       return receipt.hash;
     } catch (error) {
       throw new Error(this.formatContractError('resolveDispute', error));
@@ -323,7 +345,7 @@ export class ContractsService {
       const amountWei = ethers.parseEther(amount);
       const tx = await this.eRWFContract.connect(treasuryWallet).mint(toAddress, amountWei);
       const receipt = await tx.wait();
-      this.logger.log(`Minted ${amount} eRWF to ${toAddress}: ${receipt.hash}`);
+      this.logger.logTransaction('mint', receipt.hash, { toAddress, amount });
       return receipt.hash;
     } catch (error) {
       throw new Error(this.formatContractError('mint', error));

@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../db/prisma.service';
@@ -6,6 +6,7 @@ import { ContractsService } from '../contracts/contracts.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { DealStatus } from '@prisma/client';
 import { ethers } from 'ethers';
+import { LoggerService } from '../../common/logger.service';
 
 const STATUS_BY_INDEX: DealStatus[] = [
   DealStatus.Created,
@@ -20,7 +21,7 @@ const STATUS_BY_INDEX: DealStatus[] = [
 
 @Injectable()
 export class EventListenerService implements OnModuleInit {
-  private readonly logger = new Logger(EventListenerService.name);
+  private readonly logger = new LoggerService(EventListenerService.name);
   private isListening = false;
 
   constructor(
@@ -37,7 +38,7 @@ export class EventListenerService implements OnModuleInit {
   async startListening(): Promise<void> {
     if (this.isListening) return;
     this.isListening = true;
-    this.logger.log('Event listener started');
+    this.logger.info('Event listener started');
     await this.syncEvents();
   }
 
@@ -74,7 +75,11 @@ export class EventListenerService implements OnModuleInit {
       });
 
       if (events.length > 0) {
-        this.logger.log(`Synced ${events.length} event(s) up to block ${currentBlock}`);
+        this.logger.info('Event sync completed', {
+          eventsProcessed: events.length,
+          fromBlock,
+          toBlock: currentBlock,
+        });
       }
     } catch (error) {
       this.logger.error(`Event sync error: ${error.message}`);
@@ -127,16 +132,18 @@ export class EventListenerService implements OnModuleInit {
             data,
           });
           fixed++;
-          this.logger.warn(
-            `Reconciled deal ${deal.dealId}: DB=${deal.status} → chain=${onChainStatus}`,
-          );
+          this.logger.warn('Deal reconciled', {
+            dealId: deal.dealId,
+            dbStatus: deal.status,
+            chainStatus: onChainStatus,
+          });
         } catch (error) {
           this.logger.error(`Reconcile deal ${deal.dealId} failed: ${error.message}`);
         }
       }
 
       if (fixed > 0) {
-        this.logger.log(`Reconciliation fixed ${fixed} deal(s)`);
+        this.logger.info('Reconciliation completed', { dealsFixed: fixed });
       }
     } catch (error) {
       this.logger.error(`Reconciliation error: ${error.message}`);
@@ -204,9 +211,12 @@ export class EventListenerService implements OnModuleInit {
       ]);
 
       if (!senderUser || !driverUser || !receiverUser) {
-        this.logger.warn(
-          `DealCreated #${id}: missing users for wallets; skipping DB create (API path or later reconcile)`,
-        );
+        this.logger.warn('DealCreated missing users', {
+          dealId: id,
+          sender,
+          driver,
+          receiver,
+        });
       } else {
         await this.prisma.deal.create({
           data: {
@@ -327,7 +337,7 @@ export class EventListenerService implements OnModuleInit {
       data: { ...data, lastSyncedBlock: blockNumber },
     });
     if (result.count === 0) {
-      this.logger.warn(`Deal ${dealId} not in DB yet; status update skipped`);
+      this.logger.warn('Deal not found for status update', { dealId });
     }
   }
 

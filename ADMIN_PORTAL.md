@@ -54,13 +54,14 @@ The Admin Arbitration Portal is a web-based dashboard that enables cooperative m
 - **Resolution Panel:** Three outcome options with confirmation flow
 
 ### 4. Resolution Execution
-Three resolution outcomes matching Phase 1 smart contract:
+Three resolution outcomes (preset buttons that call `resolveDispute` with a sender/receiver split).  
+**Escrow never pays the driver.** The locked amount only moves between farmer (sender) and buyer (receiver). Any transporter fee is settled privately between the sender who hired the driver and the driver, outside this system.
 
-| Outcome | Description | Fund Distribution |
-|---------|-------------|-------------------|
+| Outcome | Meaning (audit label) | On-chain fund split |
+|---------|------------------------|---------------------|
 | **Driver Fraud** | Driver lied about delivery | 100% refund to buyer (receiver) |
-| **Faulty Goods** | Goods were defective | 100% refund to buyer (receiver) |
-| **False Buyer Claim** | Buyer making false claim | 100% payment to farmer (sender) |
+| **Faulty Goods** | Goods defective; not treated as driver fraud | 100% refund to buyer (receiver) — *same money path as Driver Fraud* |
+| **False Buyer Claim** | Buyer claim rejected | 100% payment to farmer (sender) |
 
 ### 5. Resolution History
 - View all past resolved disputes

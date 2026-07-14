@@ -44,10 +44,11 @@ app.post('/ussd', async (req, res) => {
       return res.send('END Invalid phone number. Use format 0788123456.');
     }
 
+    // Canonical under the hood: +2507XXXXXXXX (UI may send 0788…)
     const phoneNumber = normalizePhoneNumber(rawPhone);
 
     console.log(
-      `USSD Request: ${phoneNumber} | Session: ${sessionId} | Input: "${redactUssdText(text)}"`
+      `USSD Request: ${phoneNumber} (from ${String(rawPhone).trim()}) | Session: ${sessionId} | Input: "${redactUssdText(text)}"`
     );
 
     let session = sessionStore.getSession(sessionId);

@@ -19,6 +19,7 @@ describe('AdminService', () => {
     deal: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      update: jest.fn(),
     },
     dealActionLog: {
       create: jest.fn(),
@@ -271,6 +272,10 @@ describe('AdminService', () => {
       mockPrismaService.admin.findUnique.mockResolvedValue(mockAdmin);
       mockPrismaService.deal.findUnique.mockResolvedValue(mockDeal);
       mockContractsService.resolveDisputeOnChain.mockResolvedValue('0xtxhash');
+      mockPrismaService.deal.update.mockResolvedValue({
+        ...mockDeal,
+        status: 'Resolved',
+      });
       mockPrismaService.dealActionLog.create.mockResolvedValue({});
 
       const result = await service.resolveDispute(
@@ -285,6 +290,18 @@ describe('AdminService', () => {
         '0',
         '500000',
       );
+      expect(mockPrismaService.deal.update).toHaveBeenCalledWith({
+        where: { dealId: 1 },
+        data: { status: 'Resolved' },
+      });
+      expect(mockPrismaService.dealActionLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          adminEmail: 'admin@test.com',
+          actorPhone: null,
+          action: 'AdminResolution_DRIVER_FRAUD',
+          txHash: '0xtxhash',
+        }),
+      });
     });
 
     it('should reject resolution for non-disputed deal', async () => {

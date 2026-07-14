@@ -1,10 +1,12 @@
 /**
- * Input validation utilities for USSD screens
- * Project standard phone format: local Rwanda MSISDN 07XXXXXXXX (e.g. 0788123456)
+ * Phone validation & normalization for USSD.
+ *
+ * User-facing (menus / simulator SIM display): local 07XXXXXXXX
+ * Under the hood (sessions, backend, DB): E.164 +2507XXXXXXXX
  */
 
 /**
- * Validate phone number format (accepts 07…, 2507…, +2507…; stored/used as 07…)
+ * Validate phone number (accepts 07…, 2507…, +2507…)
  */
 function isValidPhoneNumber(input) {
   const cleaned = input.trim().replace(/[\s-]+/g, '');
@@ -17,24 +19,35 @@ function isValidPhoneNumber(input) {
 }
 
 /**
- * Normalize to local 07XXXXXXXX (not +250…)
+ * Normalize to international +2507XXXXXXXX for storage & API calls.
  */
 function normalizePhoneNumber(input) {
   const cleaned = input.trim().replace(/[\s-]+/g, '');
 
   if (/^07\d{8}$/.test(cleaned)) {
-    return cleaned;
+    return '+250' + cleaned.slice(1);
   }
 
   if (/^\+2507\d{8}$/.test(cleaned)) {
-    return '0' + cleaned.slice(4);
+    return cleaned;
   }
 
   if (/^2507\d{8}$/.test(cleaned)) {
-    return '0' + cleaned.slice(3);
+    return '+' + cleaned;
   }
 
   return cleaned;
+}
+
+/**
+ * Local display form 07XXXXXXXX (what users type / see on the handset).
+ */
+function formatPhoneForDisplay(input) {
+  const e164 = normalizePhoneNumber(input);
+  if (/^\+2507\d{8}$/.test(e164)) {
+    return '0' + e164.slice(4);
+  }
+  return input;
 }
 
 /**
@@ -80,6 +93,7 @@ function redactUssdText(text) {
 module.exports = {
   isValidPhoneNumber,
   normalizePhoneNumber,
+  formatPhoneForDisplay,
   isValidPin,
   isValidAmount,
   isValidChoice,

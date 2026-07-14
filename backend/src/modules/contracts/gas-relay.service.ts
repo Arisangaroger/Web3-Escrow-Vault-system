@@ -1,10 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ethers } from 'ethers';
+import { LoggerService } from '../../common/logger.service';
 
 @Injectable()
 export class GasRelayService {
-  private readonly logger = new Logger(GasRelayService.name);
+  private readonly logger = new LoggerService(GasRelayService.name);
   private readonly provider: ethers.Provider;
   private readonly treasuryWallet: ethers.Wallet;
   private readonly gasThreshold: string;
@@ -23,7 +24,9 @@ export class GasRelayService {
     this.provider = new ethers.JsonRpcProvider(rpcUrl);
     this.treasuryWallet = new ethers.Wallet(treasuryKey, this.provider);
 
-    this.logger.log(`✅ Treasury wallet: ${this.treasuryWallet.address}`);
+    this.logger.info('Treasury wallet initialized', {
+      address: this.treasuryWallet.address,
+    });
   }
 
   /**
@@ -35,10 +38,12 @@ export class GasRelayService {
 
     if (balance < threshold) {
       const topUpAmount = ethers.parseEther(this.gasTopUpAmount);
-      
-      this.logger.log(
-        `⛽ Funding ${walletAddress} with ${this.gasTopUpAmount} ETH (current: ${ethers.formatEther(balance)})`
-      );
+
+      this.logger.info('Gas top-up initiated', {
+        wallet: walletAddress,
+        currentBalance: ethers.formatEther(balance),
+        topUpAmount: this.gasTopUpAmount,
+      });
 
       const tx = await this.treasuryWallet.sendTransaction({
         to: walletAddress,
@@ -46,7 +51,10 @@ export class GasRelayService {
       });
 
       await tx.wait();
-      this.logger.log(`✅ Gas top-up confirmed: ${tx.hash}`);
+      this.logger.logTransaction('gasTopUp', tx.hash, {
+        wallet: walletAddress,
+        amount: this.gasTopUpAmount,
+      });
     }
   }
 
@@ -64,12 +72,13 @@ export class GasRelayService {
   async checkTreasuryHealth(): Promise<void> {
     const balance = await this.provider.getBalance(this.treasuryWallet.address);
     const minBalance = ethers.parseEther('0.5'); // 0.5 ETH minimum
+    const balanceFormatted = ethers.formatEther(balance);
 
-    if (balance < minBalance) {
-      this.logger.warn(
-        `⚠️  Treasury balance low: ${ethers.formatEther(balance)} ETH. Please refill!`
-      );
-    }
+    this.logger.logBalance(
+      this.treasuryWallet.address,
+      balanceFormatted,
+      '0.5',
+    );
   }
 
   /**

@@ -65,13 +65,16 @@ model Deal {
 model DealActionLog {
   id          Int      @id @default(autoincrement())
   dealId      Int      @map("deal_id")
-  actorPhone  String   @map("actor_phone")
+  /// Party phone when a user acted; null for admin-only actions.
+  actorPhone  String?  @map("actor_phone")
+  /// Portal admin email when resolution was decided in Phase 4 (identity ≠ on-chain key).
+  adminEmail  String?  @map("admin_email")
   action      String
   timestamp   DateTime @default(now())
   txHash      String   @map("tx_hash")
 
   deal        Deal     @relation(fields: [dealId], references: [dealId])
-  actor       User     @relation(fields: [actorPhone], references: [phoneNumber])
+  actor       User?    @relation(fields: [actorPhone], references: [phoneNumber])
 
   @@map("deal_action_log")
 }

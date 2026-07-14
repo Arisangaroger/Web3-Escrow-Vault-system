@@ -318,34 +318,14 @@ Get full details of a specific deal.
 
 ## Admin Functions
 
-### Resolve Dispute
-**POST** `/deals/:dealId/resolve`
+Dispute resolution is **not** exposed on the public `/deals/*` API.
+Use the authenticated admin portal endpoints instead:
 
-Admin resolves a disputed deal.
+**POST** `/admin/disputes/:dealId/resolve`  
+Auth: admin JWT cookie  
+Body: `{ "outcome": "DRIVER_FRAUD" | "FAULTY_GOODS" | "FALSE_BUYER_CLAIM" }`
 
-**Request:**
-```json
-{
-  "amountToSender": "600",
-  "amountToReceiver": "400"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "txHash": "0xabc..."
-  }
-}
-```
-
-**Business Rules:**
-- Only callable by admin (treasury wallet)
-- Deal must be in Disputed status
-- Amounts must sum to deal amount
-- Supports any split (0/100, 50/50, 70/30, etc.)
+The backend maps the outcome to a sender/receiver split and calls on-chain `resolveDispute` via the relay wallet (`ADMIN_ROLE`).
 
 ---
 
@@ -508,11 +488,12 @@ curl -X POST http://localhost:3000/deals/0/revoke -d '{
   "reasonCode":1
 }'
 
-# 8. Admin resolves (50/50 split)
-curl -X POST http://localhost:3000/deals/0/resolve -d '{
-  "amountToSender":"500",
-  "amountToReceiver":"500"
-}'
+# 8. Admin resolves via authenticated portal API (JWT cookie required)
+# Login first: POST /admin/login → cookie admin_token
+curl -X POST http://localhost:3000/admin/disputes/0/resolve \
+  -H 'Content-Type: application/json' \
+  -b 'admin_token=<jwt>' \
+  -d '{"outcome":"DRIVER_FRAUD"}'
 ```
 
 ---
@@ -523,5 +504,5 @@ curl -X POST http://localhost:3000/deals/0/resolve -d '{
 2. **Rate Limiting:** Implement per-phone rate limits
 3. **Monitoring:** Add structured logging and metrics
 4. **Real SMS:** Replace simulated notifications with actual gateway
-5. **Admin Auth:** Secure dispute resolution endpoint
+5. **Admin Auth:** Dispute resolution only via `/admin/*` (JWT)
 6. **Webhooks:** Add webhook support for USSD provider callbacks

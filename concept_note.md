@@ -119,11 +119,11 @@ The Admin uses a dedicated web portal (not USSD, due to complexity) to review:
 
 After physical/offline investigation, the Admin selects one of the predefined resolutions, each mapped directly to a smart contract function:
 
-| Resolution | Outcome |
+| Resolution | On-chain outcome |
 |---|---|
-| **Driver Fraud** | Full refund to buyer; driver forfeits any transport-linked funds as a penalty |
-| **Faulty Goods (not driver's fault)** | Buyer refunded for goods; driver's portion (if any) still honored for completed physical work |
-| **False Buyer Claim** | Contract overrides the freeze and force-releases funds to the sender |
+| **Driver Fraud** | Full refund to buyer (receiver). Escrow only moves funds between sender and receiver. |
+| **Faulty Goods (not driver's fault)** | Full refund to buyer (receiver) — same on-chain split as Driver Fraud. Reason differs for audit only. Driver pay is **not** handled by the contract (farmer pays transporter off-platform). |
+| **False Buyer Claim** | Contract force-releases the full locked amount to the sender (farmer). |
 
 ### 7.7 Revoke Logic
 

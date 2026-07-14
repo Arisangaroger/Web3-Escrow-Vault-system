@@ -1,13 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../db/prisma.service';
 import { ContractsService } from '../contracts/contracts.service';
 import { GasRelayService } from '../contracts/gas-relay.service';
 import { DealStatus } from '@prisma/client';
+import { LoggerService } from '../../common/logger.service';
 
 @Injectable()
 export class KeeperService {
-  private readonly logger = new Logger(KeeperService.name);
+  private readonly logger = new LoggerService(KeeperService.name);
 
   constructor(
     private prisma: PrismaService,
@@ -21,7 +22,12 @@ export class KeeperService {
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
   async sweepExpiredFundLocks(): Promise<void> {
-    this.logger.log('🧹 Sweeping expired fund locks...');
+    const stats = {
+      evaluated: 0,
+      actioned: 0,
+      failed: 0,
+      skipped: 0,
+    };
 
     try {
       // Find Created deals past fund lock deadline
@@ -34,7 +40,7 @@ export class KeeperService {
         },
       });
 
-      this.logger.log(`Found ${expiredDeals.length} expired deal(s)`);
+      stats.evaluated = expiredDeals.length;
 
       for (const deal of expiredDeals) {
         try {
@@ -43,24 +49,28 @@ export class KeeperService {
           
           // Status enum: 0=Created, 6=Cancelled
           if (Number(onChainDeal.status) === 0) {
-            this.logger.log(`Auto-cancelling deal ${deal.dealId}...`);
             await this.contractsService.autoCancelOnChain(deal.dealId);
-            this.logger.log(`✅ Deal ${deal.dealId} auto-cancelled`);
+            stats.actioned++;
+            this.logger.logDeal('Auto-cancelled (fund lock expired)', deal.dealId);
           } else {
-            this.logger.debug(
-              `Deal ${deal.dealId} already transitioned to status ${onChainDeal.status}`
-            );
+            stats.skipped++;
+            this.logger.debug('Deal already transitioned', {
+              dealId: deal.dealId,
+              onChainStatus: Number(onChainDeal.status),
+            });
           }
         } catch (error) {
-          this.logger.error(`❌ Failed to auto-cancel deal ${deal.dealId}: ${error.message}`);
-          // Continue with next deal
+          stats.failed++;
+          this.logger.error('Failed to auto-cancel deal', error, { dealId: deal.dealId });
         }
       }
+
+      this.logger.logKeeper('Expired fund locks sweep completed', stats);
 
       // Check treasury health
       await this.gasRelayService.checkTreasuryHealth();
     } catch (error) {
-      this.logger.error(`❌ Sweep expired fund locks error: ${error.message}`);
+      this.logger.error('Sweep expired fund locks failed', error);
     }
   }
 
@@ -70,7 +80,12 @@ export class KeeperService {
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
   async sweepExpiredPayouts(): Promise<void> {
-    this.logger.log('🧹 Sweeping expired payouts...');
+    const stats = {
+      evaluated: 0,
+      actioned: 0,
+      failed: 0,
+      skipped: 0,
+    };
 
     try {
       // Find Delivered deals past payout ready time
@@ -83,7 +98,7 @@ export class KeeperService {
         },
       });
 
-      this.logger.log(`Found ${readyDeals.length} deal(s) ready for payout`);
+      stats.evaluated = readyDeals.length;
 
       for (const deal of readyDeals) {
         try {
@@ -92,24 +107,28 @@ export class KeeperService {
           
           // Status enum: 3=Delivered
           if (Number(onChainDeal.status) === 3) {
-            this.logger.log(`Releasing funds for deal ${deal.dealId}...`);
             await this.contractsService.releaseFundsOnChain(deal.dealId);
-            this.logger.log(`✅ Funds released for deal ${deal.dealId}`);
+            stats.actioned++;
+            this.logger.logDeal('Funds auto-released (dispute window expired)', deal.dealId);
           } else {
-            this.logger.debug(
-              `Deal ${deal.dealId} already transitioned to status ${onChainDeal.status}`
-            );
+            stats.skipped++;
+            this.logger.debug('Deal already transitioned', {
+              dealId: deal.dealId,
+              onChainStatus: Number(onChainDeal.status),
+            });
           }
         } catch (error) {
-          this.logger.error(`❌ Failed to release funds for deal ${deal.dealId}: ${error.message}`);
-          // Continue with next deal
+          stats.failed++;
+          this.logger.error('Failed to release funds', error, { dealId: deal.dealId });
         }
       }
+
+      this.logger.logKeeper('Expired payouts sweep completed', stats);
 
       // Check treasury health
       await this.gasRelayService.checkTreasuryHealth();
     } catch (error) {
-      this.logger.error(`❌ Sweep expired payouts error: ${error.message}`);
+      this.logger.error('Sweep expired payouts failed', error);
     }
   }
 
@@ -119,12 +138,15 @@ export class KeeperService {
   @Cron(CronExpression.EVERY_HOUR)
   async healthCheck(): Promise<void> {
     try {
-      const treasuryBalance = await this.gasRelayService.getTreasuryBalance();
-      this.logger.log(`💰 Treasury balance: ${treasuryBalance} ETH`);
+      const wallet = this.gasRelayService.getTreasuryWallet();
+      const balance = await this.gasRelayService.getTreasuryBalance();
+      const threshold = '0.5'; // 0.5 ETH warning threshold
+
+      this.logger.logBalance(wallet.address, balance, threshold);
       
       await this.gasRelayService.checkTreasuryHealth();
     } catch (error) {
-      this.logger.error(`❌ Health check error: ${error.message}`);
+      this.logger.error('Health check failed', error);
     }
   }
 }

@@ -1,5 +1,5 @@
 const MenuNode = require('../MenuNode');
-const { isValidChoice, isValidPin } = require('../../utils/validators');
+const { isValidChoice, isValidPin, formatPhoneForDisplay } = require('../../utils/validators');
 
 /**
  * Create deal - confirm and execute (async after PIN verify)
@@ -14,8 +14,8 @@ class CreateDealConfirmNode extends MenuNode {
 
     return this.con(
       `Confirm New Deal:\n` +
-        `Receiver: ${deal.receiverPhone}\n` +
-        `Driver: ${deal.driverPhone}\n` +
+        `Receiver: ${formatPhoneForDisplay(deal.receiverPhone)}\n` +
+        `Driver: ${formatPhoneForDisplay(deal.driverPhone)}\n` +
         `Amount: ${deal.amount} RWF\n\n` +
         `1. Confirm\n` +
         `2. Cancel`

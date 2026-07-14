@@ -275,7 +275,8 @@ export class AdminService {
       timeline: deal.actionLogs.map((log) => ({
         action: log.action,
         actorPhone: log.actorPhone,
-        actorName: log.actor.phoneNumber,
+        adminEmail: log.adminEmail,
+        actorName: log.actor?.phoneNumber || log.adminEmail || 'system',
         timestamp: log.timestamp,
         txHash: log.txHash,
       })),
@@ -343,10 +344,19 @@ export class AdminService {
       amountToReceiver,
     );
 
+    // Optimistic local status — do not wait for the chain event listener (~30s).
+    // Listener remains idempotent and still drives SMS notifications.
+    await this.prisma.deal.update({
+      where: { dealId },
+      data: { status: 'Resolved' },
+    });
+
+    // Audit which portal admin decided (identity ≠ relay signer).
     await this.prisma.dealActionLog.create({
       data: {
         dealId,
-        actorPhone: admin.email,
+        actorPhone: null,
+        adminEmail: admin.email,
         action: `AdminResolution_${outcome}`,
         timestamp: new Date(),
         txHash,
@@ -392,7 +402,10 @@ export class AdminService {
       receiverPhone: deal.receiverPhone,
       disputeReasonCode: deal.disputeReasonCode,
       disputeReasonText: this.getDisputeReasonText(deal.disputeReasonCode),
-      resolvedBy: deal.actionLogs[0]?.actorPhone || 'Unknown',
+      resolvedBy:
+        deal.actionLogs[0]?.adminEmail ||
+        deal.actionLogs[0]?.actorPhone ||
+        'Unknown',
       resolutionOutcome:
         deal.actionLogs[0]?.action.replace('AdminResolution_', '') || 'Unknown',
       resolvedAt: deal.actionLogs[0]?.timestamp,
