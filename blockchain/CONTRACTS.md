@@ -171,21 +171,26 @@ npx hardhat coverage
 
 ## Deployment (Polygon Amoy)
 
+**Meta-tx model (no forwarder):**
+- `RELAY_ROLE` alone submits party actions and pays gas
+- `_verifySigner` (EIP-712 + nonce) establishes the logical caller
+- Escrow holds `ESCROW_ROLE` on eRWF and uses `pullFrom` after verifying the buyer — no approve/permit
+
 ```bash
-# blockchain/.env: PRIVATE_KEY with Amoy MATIC
+# blockchain/.env: PRIVATE_KEY with Amoy MATIC (deployer = operator/admin/relay by default)
 npx hardhat run scripts/deploy.js --network amoy
 ```
 
-Copy Escrow + eRWF addresses into `backend/.env` (`CHAIN_ID=80002`, Amoy `RPC_URL`).
+Copy new Escrow + eRWF addresses into `backend/.env` (`CHAIN_ID=80002`).
+`TREASURY_PRIVATE_KEY` must hold Escrow `RELAY_ROLE` (+ `ADMIN_ROLE` for disputes).
 
-Unit tests (local Hardhat network, not Amoy):
 ```bash
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat coverage
+cd backend
+npm run sync:abis
+npm run seed:demo
 ```
 
-Verify on PolygonScan Amoy after deploy (optional):
+Unit tests:
 ```bash
-npx hardhat run scripts/verify-contracts.js --network amoy
+npx hardhat test
 ```

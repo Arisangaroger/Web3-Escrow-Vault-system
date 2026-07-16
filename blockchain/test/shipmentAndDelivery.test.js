@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { signAction } = require("./helpers/signatures");
+const { deployEscrowSystem } = require("./helpers/deploy");
 
 describe("Escrow - Shipment and Delivery", function () {
   let token, escrow;
@@ -11,21 +12,14 @@ describe("Escrow - Shipment and Delivery", function () {
   beforeEach(async function () {
     [admin, operator, sender, driver, receiver, relay] = await ethers.getSigners();
 
-    // Deploy contracts
-    const ERWF = await ethers.getContractFactory("eRWF");
-    token = await ERWF.deploy(operator.address);
-    await token.waitForDeployment();
-
-    const Escrow = await ethers.getContractFactory("Escrow");
-    escrow = await Escrow.deploy(await token.getAddress(), admin.address);
-    await escrow.waitForDeployment();
-    
-    escrowAddress = await escrow.getAddress();
-    chainId = (await ethers.provider.getNetwork()).chainId;
+    ({ token, escrow, escrowAddress, chainId } = await deployEscrowSystem({
+      admin,
+      operator,
+      relay,
+    }));
 
     // Create and lock deal
     await token.connect(operator).mint(receiver.address, amount);
-    await token.connect(receiver).approve(escrowAddress, amount);
     
     let nonce = await escrow.getNonce(sender.address);
     let signature = await signAction(sender, escrowAddress, chainId, "createDeal", 0, nonce);
@@ -125,7 +119,6 @@ describe("Escrow - Shipment and Delivery", function () {
     it("Should reject mark delivered if not in Shipped status", async function () {
       // Create new deal, lock but don't ship
       await token.connect(operator).mint(receiver.address, amount);
-      await token.connect(receiver).approve(escrowAddress, amount);
       
       let nonce = await escrow.getNonce(sender.address);
       let signature = await signAction(sender, escrowAddress, chainId, "createDeal", 1, nonce);

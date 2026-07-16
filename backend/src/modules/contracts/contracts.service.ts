@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ethers } from 'ethers';
+import { ethers, Contract } from 'ethers';
 import { GasRelayService } from './gas-relay.service';
 import { SignatureService } from './signature.service';
 import * as EscrowArtifact from './abis/Escrow.json';
@@ -10,8 +10,8 @@ import { LoggerService } from '../../common/logger.service';
 @Injectable()
 export class ContractsService {
   private readonly logger = new LoggerService(ContractsService.name);
-  private readonly escrowContract: ethers.Contract;
-  private readonly eRWFContract: ethers.Contract;
+  private readonly escrowContract: Contract & any;
+  private readonly eRWFContract: Contract & any;
   private readonly chainId: number;
 
   constructor(
@@ -20,13 +20,16 @@ export class ContractsService {
     private signatureService: SignatureService,
   ) {
     const provider = this.gasRelayService.getProvider();
-    const escrowAddress = this.configService.get<string>('ESCROW_CONTRACT_ADDRESS');
-    const eRWFAddress = this.configService.get<string>('ERWF_CONTRACT_ADDRESS');
+    const escrowAddress = this.normalizeAddress(
+      this.configService.get<string>('ESCROW_CONTRACT_ADDRESS'),
+      'ESCROW_CONTRACT_ADDRESS',
+    );
+    const eRWFAddress = this.normalizeAddress(
+      this.configService.get<string>('ERWF_CONTRACT_ADDRESS'),
+      'ERWF_CONTRACT_ADDRESS',
+    );
     this.chainId = Number(this.configService.get<string | number>('CHAIN_ID'));
 
-    if (!escrowAddress || !eRWFAddress) {
-      throw new Error('ESCROW_CONTRACT_ADDRESS and ERWF_CONTRACT_ADDRESS must be set');
-    }
     if (!Number.isFinite(this.chainId) || this.chainId <= 0) {
       throw new Error('CHAIN_ID must be a positive number');
     }
@@ -34,8 +37,8 @@ export class ContractsService {
     const escrowAbi = (EscrowArtifact as any).abi ?? EscrowArtifact;
     const eRWFAbi = (eRWFArtifact as any).abi ?? eRWFArtifact;
 
-    this.escrowContract = new ethers.Contract(escrowAddress, escrowAbi, provider);
-    this.eRWFContract = new ethers.Contract(eRWFAddress, eRWFAbi, provider);
+    this.escrowContract = new ethers.Contract(escrowAddress, escrowAbi, provider) as any;
+    this.eRWFContract = new ethers.Contract(eRWFAddress, eRWFAbi, provider) as any;
 
     // Dispute resolution uses the relay/treasury wallet. On deploy, that address
     // (or ADMIN_ADDRESS) receives ADMIN_ROLE — no separate admin key needed.
@@ -96,7 +99,8 @@ export class ContractsService {
   }
 
   /**
-   * Lock funds — receiver approves ERC20 (needs gas), then meta-tx lockFunds
+   * Lock funds — receiver signs Escrow EIP-712 Action; relay submits lockFunds.
+   * Escrow pulls eRWF via ESCROW_ROLE (no approve / permit / user gas).
    */
   async lockFundsOnChain(
     receiverWallet: ethers.Wallet | ethers.HDNodeWallet,
@@ -104,15 +108,8 @@ export class ContractsService {
   ): Promise<string> {
     try {
       const receiverAddress = receiverWallet.address;
-      const connectedWallet = receiverWallet.connect(this.gasRelayService.getProvider());
       const escrowAddress = await this.escrowContract.getAddress();
-      const deal = await this.escrowContract.getDeal(dealId);
-
-      await this.gasRelayService.ensureGasFunded(receiverAddress);
-
-      const eRWFWithWallet = this.eRWFContract.connect(connectedWallet);
-      const approveTx = await eRWFWithWallet.approve(escrowAddress, deal.amount);
-      await approveTx.wait();
+      const relayWallet = this.gasRelayService.getTreasuryWallet();
 
       const nonce = await this.escrowContract.getNonce(receiverAddress);
       const signature = await this.signatureService.signAction(
@@ -124,7 +121,6 @@ export class ContractsService {
         Number(nonce),
       );
 
-      const relayWallet = this.gasRelayService.getTreasuryWallet();
       const tx = await this.escrowContract.connect(relayWallet).lockFunds(dealId, signature);
       const receipt = await tx.wait();
 
@@ -339,6 +335,10 @@ export class ContractsService {
     return this.chainId;
   }
 
+  async getTokenBalance(address: string): Promise<bigint> {
+    return this.eRWFContract.balanceOf(address);
+  }
+
   async mintTokens(toAddress: string, amount: string): Promise<string> {
     try {
       const treasuryWallet = this.gasRelayService.getTreasuryWallet();
@@ -350,6 +350,19 @@ export class ContractsService {
     } catch (error) {
       throw new Error(this.formatContractError('mint', error));
     }
+  }
+
+  private normalizeAddress(value: string | undefined, envName: string): string {
+    const trimmed = (value || '').trim().replace(/^["']|["']$/g, '');
+    if (!trimmed) {
+      throw new Error(`${envName} must be set`);
+    }
+    if (!ethers.isAddress(trimmed)) {
+      throw new Error(
+        `${envName} is not a valid address: "${trimmed}". Check for typos or leading spaces in backend/.env`,
+      );
+    }
+    return ethers.getAddress(trimmed);
   }
 
   private formatContractError(action: string, error: any): string {

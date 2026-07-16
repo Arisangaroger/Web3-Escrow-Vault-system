@@ -14,9 +14,10 @@ async function main() {
   console.log("   eRWF deployed to:", await token.getAddress());
 
   const Escrow = await hre.ethers.getContractFactory("Escrow");
-  const escrow = await Escrow.deploy(await token.getAddress(), admin.address);
+  const escrow = await Escrow.deploy(await token.getAddress(), admin.address, relay.address);
   await escrow.waitForDeployment();
   const escrowAddress = await escrow.getAddress();
+  await (await token.grantRole(await token.ESCROW_ROLE(), escrowAddress)).wait();
   const chainId = (await hre.ethers.provider.getNetwork()).chainId;
   console.log("   Escrow deployed to:", escrowAddress);
 
@@ -40,9 +41,8 @@ async function main() {
   await tx1.wait();
   console.log("   Deal created with ID: 0");
 
-  // Lock funds
+  // Lock funds (signature only — Escrow pullFrom, no approve)
   console.log("\n4. Receiver locking funds...");
-  await token.connect(receiver).approve(escrowAddress, amount);
   nonce = await escrow.getNonce(receiver.address);
   signature = await signAction(receiver, escrowAddress, chainId, "lockFunds", 0, nonce);
   const tx2 = await escrow.connect(relay).lockFunds(0, signature);

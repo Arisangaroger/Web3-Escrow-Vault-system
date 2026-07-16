@@ -13,12 +13,14 @@ async function main() {
     "\n"
   );
 
-  // Operator mints/burns eRWF; admin controls Escrow arbitration
+  // Operator mints eRWF; admin arbitrates; relay submits party meta-txs (often same key)
   const operatorAddress = process.env.OPERATOR_ADDRESS || deployer.address;
   const adminAddress = process.env.ADMIN_ADDRESS || deployer.address;
+  const relayAddress = process.env.RELAY_ADDRESS || adminAddress;
 
   console.log("Operator address:", operatorAddress);
   console.log("Admin address:", adminAddress);
+  console.log("Relay address:", relayAddress);
   console.log();
 
   // Deploy eRWF Token (operator gets OPERATOR_ROLE + DEFAULT_ADMIN_ROLE)
@@ -30,14 +32,18 @@ async function main() {
   console.log("eRWF token deployed to:", tokenAddress);
   console.log();
 
-  // Deploy Escrow Contract
+  // Deploy Escrow (admin + dedicated relay)
   console.log("Deploying Escrow contract...");
   const Escrow = await hre.ethers.getContractFactory("Escrow");
-  const escrow = await Escrow.deploy(tokenAddress, adminAddress);
+  const escrow = await Escrow.deploy(tokenAddress, adminAddress, relayAddress);
   await escrow.waitForDeployment();
   const escrowAddress = await escrow.getAddress();
   console.log("Escrow contract deployed to:", escrowAddress);
-  console.log();
+
+  // Escrow may pullFrom after verifying user signatures (no approve/permit)
+  const escrowRole = await token.ESCROW_ROLE();
+  await (await token.grantRole(escrowRole, escrowAddress)).wait();
+  console.log("Granted ESCROW_ROLE on eRWF to Escrow\n");
 
   console.log("Deployment complete!\n");
 
@@ -56,12 +62,15 @@ async function main() {
       Escrow: {
         address: escrowAddress,
         admin: adminAddress,
+        relay: relayAddress,
         token: tokenAddress,
       },
     },
     roles: {
       OPERATOR_ROLE: await token.OPERATOR_ROLE(),
+      ESCROW_ROLE: await token.ESCROW_ROLE(),
       ADMIN_ROLE: await escrow.ADMIN_ROLE(),
+      RELAY_ROLE: await escrow.RELAY_ROLE(),
     },
   };
 

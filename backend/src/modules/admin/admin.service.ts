@@ -70,7 +70,15 @@ export class AdminService {
       );
     }
 
-    const isValidPassword = await argon2.verify(admin.passwordHash, password);
+    let isValidPassword = false;
+    try {
+      isValidPassword = await argon2.verify(admin.passwordHash, password);
+    } catch (err) {
+      this.logger.error(
+        `Admin password hash invalid for ${email} — run: npm run ensure:admin`,
+      );
+      throw new UnauthorizedException('Invalid credentials');
+    }
 
     if (!isValidPassword) {
       const attempts = admin.failedLoginAttempts + 1;

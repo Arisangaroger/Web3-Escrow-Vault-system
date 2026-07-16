@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { signAction } = require("./helpers/signatures");
+const { deployEscrowSystem } = require("./helpers/deploy");
 
 describe("Escrow - Deal Creation", function () {
   let token, escrow;
@@ -10,18 +11,11 @@ describe("Escrow - Deal Creation", function () {
   beforeEach(async function () {
     [admin, operator, sender, driver, receiver, other, relay] = await ethers.getSigners();
 
-    // Deploy eRWF token
-    const ERWF = await ethers.getContractFactory("eRWF");
-    token = await ERWF.deploy(operator.address);
-    await token.waitForDeployment();
-
-    // Deploy Escrow
-    const Escrow = await ethers.getContractFactory("Escrow");
-    escrow = await Escrow.deploy(await token.getAddress(), admin.address);
-    await escrow.waitForDeployment();
-    
-    escrowAddress = await escrow.getAddress();
-    chainId = (await ethers.provider.getNetwork()).chainId;
+    ({ token, escrow, escrowAddress, chainId } = await deployEscrowSystem({
+      admin,
+      operator,
+      relay,
+    }));
   });
 
   describe("Successful Creation", function () {

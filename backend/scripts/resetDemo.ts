@@ -1,9 +1,9 @@
 /**
  * Reset demo environment (Polygon Amoy).
  *
- * Clears demo rows from Postgres only. On-chain history on Amoy cannot be
- * wiped; after reset, run `npm run seed:demo` to mint/create fresh deals on
- * the same Escrow + eRWF addresses already in backend/.env.
+ * Clears demo deals / logs / notifications from Postgres.
+ * Keeps demo User rows (custodial wallets) so Amoy MATIC previously
+ * topped up onto those addresses is reusable on the next seed:demo.
  *
  * Usage:
  *   npm run reset:demo
@@ -22,7 +22,7 @@ const DEMO_PHONES = [
 ];
 
 async function clearDemoDb() {
-  console.log('🧹 Clearing demo data from DB (Amoy chain left unchanged)...\n');
+  console.log('🧹 Clearing demo deals/logs from DB (users/wallets kept)...\n');
 
   const deals = await prisma.deal.findMany({
     where: {
@@ -50,12 +50,14 @@ async function clearDemoDb() {
   await prisma.notificationLog.deleteMany({
     where: { recipientPhone: { in: DEMO_PHONES } },
   });
-  await prisma.user.deleteMany({
+
+  const kept = await prisma.user.count({
     where: { phoneNumber: { in: DEMO_PHONES } },
   });
-
-  console.log('✅ Demo DB reset complete.');
-  console.log('💡 Next: npm run seed:demo  (new deals on existing Amoy contracts)');
+  console.log(
+    `✅ Demo DB reset complete (kept ${kept} user wallet(s) — MATIC on those addresses stays usable).`,
+  );
+  console.log('💡 Next: npm run seed:demo');
 }
 
 async function main() {

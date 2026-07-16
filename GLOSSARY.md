@@ -15,8 +15,9 @@ Plain-language definitions for the Escrow Vault prototype. Technical terms map t
 | **Custodial wallet** | A blockchain wallet the **backend** creates and stores encrypted for each phone number; the user never holds a private key on their phone. |
 | **PIN** | Four-digit code proving the person at that phone number authorized an action. |
 | **Meta-transaction (meta-tx)** | User signs an action off-chain; the **relay/treasury** wallet submits it and pays gas. Identity ≠ gas payer. |
-| **EIP-712** | Signature format used so meta-tx approvals can’t be forged or replayed. |
-| **Relay / treasury wallet** | Shared backend key that pays gas and holds Escrow **ADMIN_ROLE** for dispute resolution. |
+| **EIP-712** | Signature format used so meta-tx approvals can’t be forged or replayed (`_verifySigner` on Escrow). |
+| **Relay / treasury wallet** | Only account with `RELAY_ROLE` that submits party txs and pays gas. Does **not** fund user wallets. |
+| **ESCROW_ROLE / pullFrom** | Token role held by Escrow; after signature verification, Escrow pulls eRWF without approve/permit. |
 | **ADMIN_ROLE** | On-chain permission to call `resolveDispute`. Held by the relay; portal admins authenticate separately with email/password. |
 | **Admin portal** | Web UI for cooperative managers to review disputed deals and pick a resolution. |
 | **Deal status** | Lifecycle of one shipment/payment: `Created` → `FundsLocked` → `Shipped` → `Delivered` → then `Released`, or `Disputed` → `Resolved`, or `Cancelled`. |

@@ -17,9 +17,10 @@ async function main() {
   const tokenAddress = await token.getAddress();
 
   const Escrow = await hre.ethers.getContractFactory("Escrow");
-  const escrow = await Escrow.deploy(tokenAddress, adminAddress);
+  const escrow = await Escrow.deploy(tokenAddress, adminAddress, deployer.address);
   await escrow.waitForDeployment();
   const escrowAddress = await escrow.getAddress();
+  await (await token.grantRole(await token.ESCROW_ROLE(), escrowAddress)).wait();
 
   console.log("eRWF:", tokenAddress);
   console.log("Escrow:", escrowAddress);

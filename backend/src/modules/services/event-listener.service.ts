@@ -32,6 +32,10 @@ export class EventListenerService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    if (process.env.DISABLE_EVENT_LISTENER === '1') {
+      this.logger.info('Event listener disabled (DISABLE_EVENT_LISTENER=1)');
+      return;
+    }
     await this.startListening();
   }
 
@@ -52,37 +56,121 @@ export class EventListenerService implements OnModuleInit {
         });
       }
 
-      const fromBlock = syncState.lastSyncedBlock + 1;
       const contract = this.contractsService.getEscrowContract();
       const provider = contract.runner.provider;
       if (!provider) return;
 
       const currentBlock = await provider.getBlockNumber();
-      if (fromBlock > currentBlock) return;
 
-      this.logger.debug(`Syncing events from block ${fromBlock} to ${currentBlock}`);
+      // Public Amoy RPCs reject large eth_getLogs (and often wildcard topics).
+      // Cold-start at tip — seed/API write the DB; catch only new blocks going forward.
+      const chunkSize = Number(
+        this.configService.get<string>('EVENT_SYNC_CHUNK_SIZE') || 100,
+      );
 
-      const events = await contract.queryFilter('*', fromBlock, currentBlock);
-      for (const event of events) {
-        if ('eventName' in event) {
-          await this.handleEvent(event as ethers.EventLog);
-        }
+      let fromBlock = syncState.lastSyncedBlock + 1;
+      if (syncState.lastSyncedBlock === 0) {
+        await this.prisma.syncState.update({
+          where: { id: syncState.id },
+          data: { lastSyncedBlock: currentBlock },
+        });
+        this.logger.info('Event sync initialized at tip (skip history)', {
+          currentBlock,
+        });
+        return;
       }
 
-      await this.prisma.syncState.update({
-        where: { id: syncState.id },
-        data: { lastSyncedBlock: currentBlock },
-      });
+      if (fromBlock > currentBlock) return;
 
-      if (events.length > 0) {
+      // Free public RPCs often refuse "archive" getLogs if cursor is far behind tip
+      const maxBehind = Number(
+        this.configService.get<string>('EVENT_SYNC_MAX_BEHIND') || 500,
+      );
+      if (currentBlock - fromBlock > maxBehind) {
+        const jumpTo = currentBlock - 50;
+        await this.prisma.syncState.update({
+          where: { id: syncState.id },
+          data: { lastSyncedBlock: jumpTo },
+        });
+        this.logger.warn('Event sync jumped toward tip (RPC archive limits)', {
+          fromBlock,
+          jumpTo,
+          currentBlock,
+        });
+        fromBlock = jumpTo + 1;
+      }
+
+      let cursor = fromBlock;
+      let totalEvents = 0;
+
+      while (cursor <= currentBlock) {
+        const toBlock = Math.min(cursor + chunkSize - 1, currentBlock);
+        this.logger.debug(`Syncing events from block ${cursor} to ${toBlock}`);
+
+        // Prefer explicit filters over queryFilter('*') (topics:[null] trips Amoy limits)
+        const filter = {
+          address: await contract.getAddress(),
+          fromBlock: cursor,
+          toBlock,
+        };
+        const logs = await provider.getLogs(filter);
+        for (const log of logs) {
+          try {
+            const parsed = contract.interface.parseLog({
+              topics: [...log.topics],
+              data: log.data,
+            });
+            if (!parsed) continue;
+            await this.handleEvent({
+              eventName: parsed.name,
+              args: parsed.args,
+              transactionHash: log.transactionHash,
+              blockNumber: log.blockNumber,
+            } as ethers.EventLog);
+            totalEvents++;
+          } catch {
+            // Non-Escrow or undecodable log
+          }
+        }
+
+        await this.prisma.syncState.update({
+          where: { id: syncState.id },
+          data: { lastSyncedBlock: toBlock },
+        });
+
+        cursor = toBlock + 1;
+      }
+
+      if (totalEvents > 0) {
         this.logger.info('Event sync completed', {
-          eventsProcessed: events.length,
+          eventsProcessed: totalEvents,
           fromBlock,
           toBlock: currentBlock,
         });
       }
     } catch (error) {
-      this.logger.error(`Event sync error: ${error.message}`);
+      const msg = String(error?.message || error);
+      this.logger.error(`Event sync error: ${msg}`);
+      // Unstick cursor when public RPC rejects the range as archive
+      if (/archive|403|Forbidden|-32602/i.test(msg)) {
+        try {
+          const contract = this.contractsService.getEscrowContract();
+          const provider = contract.runner?.provider;
+          const syncState = await this.prisma.syncState.findFirst();
+          if (provider && syncState) {
+            const tip = await provider.getBlockNumber();
+            await this.prisma.syncState.update({
+              where: { id: syncState.id },
+              data: { lastSyncedBlock: tip },
+            });
+            this.logger.warn('Event sync cursor reset to tip after RPC reject', {
+              tip,
+            });
+          }
+        } catch {
+          // ignore secondary failure
+        }
+      }
     }
   }
 

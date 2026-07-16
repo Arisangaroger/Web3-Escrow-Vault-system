@@ -6,8 +6,9 @@ require("dotenv").config();
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: {
-    version: "0.8.20",
+    version: "0.8.28",
     settings: {
+      evmVersion: "cancun",
       optimizer: {
         enabled: true,
         runs: 200,
@@ -19,11 +20,15 @@ module.exports = {
       chainId: 1337,
     },
     // Polygon Amoy Testnet (Primary deployment target)
+    // Official public RPC often times out; override with AMOY_RPC_URL in .env
     amoy: {
-      url: process.env.AMOY_RPC_URL || "https://rpc-amoy.polygon.technology",
+      url:
+        process.env.AMOY_RPC_URL ||
+        "https://polygon-amoy-bor-rpc.publicnode.com",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       chainId: 80002,
-      gasPrice: 8000000000, // 8 gwei
+      gasPrice: 30000000000, // 30 gwei (Amoy minimum is ~25 gwei)
+      timeout: 180000,
     },
     // Avalanche Fuji Testnet
     fuji: {

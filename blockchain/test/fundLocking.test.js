@@ -2,6 +2,7 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
 const { signAction } = require("./helpers/signatures");
+const { deployEscrowSystem } = require("./helpers/deploy");
 
 describe("Escrow - Fund Locking", function () {
   let token, escrow;
@@ -12,21 +13,13 @@ describe("Escrow - Fund Locking", function () {
   beforeEach(async function () {
     [admin, operator, sender, driver, receiver, relay] = await ethers.getSigners();
 
-    // Deploy contracts
-    const ERWF = await ethers.getContractFactory("eRWF");
-    token = await ERWF.deploy(operator.address);
-    await token.waitForDeployment();
+    ({ token, escrow, escrowAddress, chainId } = await deployEscrowSystem({
+      admin,
+      operator,
+      relay,
+    }));
 
-    const Escrow = await ethers.getContractFactory("Escrow");
-    escrow = await Escrow.deploy(await token.getAddress(), admin.address);
-    await escrow.waitForDeployment();
-    
-    escrowAddress = await escrow.getAddress();
-    chainId = (await ethers.provider.getNetwork()).chainId;
-
-    // Mint tokens to receiver and approve escrow
     await token.connect(operator).mint(receiver.address, amount);
-    await token.connect(receiver).approve(escrowAddress, amount);
   });
 
   describe("Successful Lock", function () {
@@ -91,7 +84,6 @@ describe("Escrow - Fund Locking", function () {
       
       // Mint more tokens for second attempt
       await token.connect(operator).mint(receiver.address, amount);
-      await token.connect(receiver).approve(escrowAddress, amount);
       
       nonce = await escrow.getNonce(receiver.address);
       signature = await signAction(receiver, escrowAddress, chainId, "lockFunds", 0, nonce);

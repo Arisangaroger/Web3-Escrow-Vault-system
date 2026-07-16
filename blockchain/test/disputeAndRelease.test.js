@@ -2,6 +2,7 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
 const { signAction } = require("./helpers/signatures");
+const { deployEscrowSystem } = require("./helpers/deploy");
 
 describe("Escrow - Dispute and Release", function () {
   let token, escrow;
@@ -12,21 +13,14 @@ describe("Escrow - Dispute and Release", function () {
   beforeEach(async function () {
     [admin, operator, sender, driver, receiver, relay] = await ethers.getSigners();
 
-    // Deploy contracts
-    const ERWF = await ethers.getContractFactory("eRWF");
-    token = await ERWF.deploy(operator.address);
-    await token.waitForDeployment();
-
-    const Escrow = await ethers.getContractFactory("Escrow");
-    escrow = await Escrow.deploy(await token.getAddress(), admin.address);
-    await escrow.waitForDeployment();
-    
-    escrowAddress = await escrow.getAddress();
-    chainId = (await ethers.provider.getNetwork()).chainId;
+    ({ token, escrow, escrowAddress, chainId } = await deployEscrowSystem({
+      admin,
+      operator,
+      relay,
+    }));
 
     // Create, lock, ship, and deliver deal
     await token.connect(operator).mint(receiver.address, amount);
-    await token.connect(receiver).approve(escrowAddress, amount);
     
     let nonce = await escrow.getNonce(sender.address);
     let signature = await signAction(sender, escrowAddress, chainId, "createDeal", 0, nonce);
@@ -102,7 +96,6 @@ describe("Escrow - Dispute and Release", function () {
     it("Should allow sender to revoke at any post-lock stage", async function () {
       // Create new deal at FundsLocked stage
       await token.connect(operator).mint(receiver.address, amount);
-      await token.connect(receiver).approve(escrowAddress, amount);
       
       let nonce = await escrow.getNonce(sender.address);
       let signature = await signAction(sender, escrowAddress, chainId, "createDeal", 1, nonce);
@@ -145,7 +138,6 @@ describe("Escrow - Dispute and Release", function () {
     it("Should allow revoke from Shipped status", async function () {
       // Create deal at Shipped stage
       await token.connect(operator).mint(receiver.address, amount);
-      await token.connect(receiver).approve(escrowAddress, amount);
       
       let nonce = await escrow.getNonce(sender.address);
       let signature = await signAction(sender, escrowAddress, chainId, "createDeal", 1, nonce);
@@ -262,7 +254,6 @@ describe("Escrow - Dispute and Release", function () {
     it("Should reject release if not in Delivered status", async function () {
       // Create new deal at Shipped stage
       await token.connect(operator).mint(receiver.address, amount);
-      await token.connect(receiver).approve(escrowAddress, amount);
       
       let nonce = await escrow.getNonce(sender.address);
       let signature = await signAction(sender, escrowAddress, chainId, "createDeal", 1, nonce);

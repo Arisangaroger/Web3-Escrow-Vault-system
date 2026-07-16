@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import * as request from 'supertest';
-import * as cookieParser from 'cookie-parser';
+import request from 'supertest';
+import cookieParser from 'cookie-parser';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/modules/db/prisma.service';
 import * as argon2 from 'argon2';
@@ -58,8 +58,10 @@ describe('Admin Portal E2E Tests', () => {
           expect(response.headers['set-cookie']).toBeDefined();
           
           // Extract token for subsequent requests
-          const cookies = response.headers['set-cookie'];
-          adminToken = cookies.find((c: string) => c.startsWith('admin_token='));
+          // Express types `set-cookie` as string | string[] depending on version
+          const raw = response.headers['set-cookie'];
+          const cookies = Array.isArray(raw) ? raw : raw ? [raw] : [];
+          adminToken = cookies.find((c) => c.startsWith('admin_token='));
         });
     });
 
@@ -174,17 +176,19 @@ describe('Admin Portal E2E Tests', () => {
         update: {},
       });
 
-      // Create test disputed deal
+      // Create test disputed deal (relation connect + required txHashCreated)
       const deal = await prisma.deal.create({
         data: {
-          senderPhone: sender.phoneNumber,
-          driverPhone: driver.phoneNumber,
-          receiverPhone: receiver.phoneNumber,
-          amount: 500000,
+          dealId: 999,
+          amount: '500000',
           status: 'Disputed',
           disputeReasonCode: 1,
           createdAt: new Date(),
           fundLockDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          txHashCreated: '0xtest_e2e_deal_999',
+          sender: { connect: { phoneNumber: sender.phoneNumber } },
+          driver: { connect: { phoneNumber: driver.phoneNumber } },
+          receiver: { connect: { phoneNumber: receiver.phoneNumber } },
         },
       });
 

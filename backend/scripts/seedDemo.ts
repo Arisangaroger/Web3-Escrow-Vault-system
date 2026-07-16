@@ -9,12 +9,14 @@
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { DealStatus } from '@prisma/client';
+import { ethers } from 'ethers';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/modules/db/prisma.service';
 import { WalletsService } from '../src/modules/wallets/wallets.service';
 import { AuthService } from '../src/modules/auth/auth.service';
 import { DealsService } from '../src/modules/services/deals.service';
 import { ContractsService } from '../src/modules/contracts/contracts.service';
+import { GasRelayService } from '../src/modules/contracts/gas-relay.service';
 
 const DEMO_USERS = [
   {
@@ -56,6 +58,7 @@ const MINT_AMOUNT = '10000000'; // eRWF per buyer
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function clearDemoData(prisma: PrismaService) {
+  // Keep User rows so the same custodial wallets (and any Amoy MATIC on them) are reused.
   const deals = await prisma.deal.findMany({
     where: {
       OR: [
@@ -77,7 +80,6 @@ async function clearDemoData(prisma: PrismaService) {
   await prisma.notificationLog.deleteMany({
     where: { recipientPhone: { in: DEMO_PHONES } },
   });
-  await prisma.user.deleteMany({ where: { phoneNumber: { in: DEMO_PHONES } } });
 }
 
 async function logAction(
@@ -105,6 +107,9 @@ async function setStatus(
 }
 
 async function main() {
+  // Avoid event-listener eth_getLogs noise / gas during seeding (writes DB itself)
+  process.env.DISABLE_EVENT_LISTENER = '1';
+
   console.log('🌱 Seeding demo data on Amoy (on-chain + DB)...\n');
 
   const required = [
@@ -131,6 +136,7 @@ async function main() {
   const auth = app.get(AuthService);
   const deals = app.get(DealsService);
   const contracts = app.get(ContractsService);
+  const gasRelay = app.get(GasRelayService);
   const chainId = contracts.getChainId();
 
   if (chainId !== 80002) {
@@ -140,12 +146,29 @@ async function main() {
   }
 
   try {
-    console.log('Clearing previous demo users/deals...');
+    const treasuryBal = await gasRelay.getTreasuryBalance();
+    const treasuryAddr = gasRelay.getTreasuryWallet().address;
+    console.log(`Treasury/relay ${treasuryAddr}: ${treasuryBal} POL (pays Amoy gas only — not sent to users)`);
+    // Seed ~15–20 on-chain txs (mint/create/lock/ship/deliver/revoke). Gas is burned as network fees.
+    const bal = Number(treasuryBal);
+    if (bal < 0.01) {
+      throw new Error(
+        `Relay has only ${treasuryBal} POL — too low to submit Amoy txs. ` +
+          `Fund ${treasuryAddr} (Alchemy/QuickNode Amoy faucet), then retry.`,
+      );
+    }
+    if (bal < 0.04) {
+      console.warn(
+        `  ⚠️  Only ${treasuryBal} POL — seed may stop mid-way if gas price spikes. Continuing anyway.\n`,
+      );
+    }
+
+    console.log('Clearing previous demo deals (keeping users/wallets)...');
     await clearDemoData(prisma);
     console.log('  ✅ Cleared\n');
 
-    // 1. Users with custodial wallets encrypted by ENCRYPTION_KEY
-    console.log('Creating demo users (ENCRYPTION_KEY wallets + PINs)...');
+    // 1. Users with custodial wallets encrypted by ENCRYPTION_KEY (reused across seeds)
+    console.log('Ensuring demo users (same phone → same wallet)...');
     for (const user of DEMO_USERS) {
       await wallets.getOrCreateWallet(user.phone);
       await auth.setPin(user.phone, user.pin);
@@ -153,12 +176,24 @@ async function main() {
       console.log(`  ✅ ${user.name} ${user.phone} PIN ${user.pin} → ${address}`);
     }
 
-    // 2. Mint eRWF to buyers so lockFunds can succeed
-    console.log(`\nMinting ${MINT_AMOUNT} eRWF to demo buyers...`);
+    // 2. Mint eRWF only (lockFunds uses Escrow pullFrom after signature — no user gas)
+    console.log(`\nFunding buyers with eRWF (mint only if needed)...`);
     for (const phone of BUYER_PHONES) {
       const address = await wallets.getWalletAddress(phone);
-      const txHash = await contracts.mintTokens(address, MINT_AMOUNT);
-      console.log(`  ✅ Minted to ${phone} (${address}) tx=${txHash}`);
+
+      let eRwfBal = 0n;
+      try {
+        eRwfBal = await contracts.getTokenBalance(address);
+      } catch {
+        // fall through to mint
+      }
+      const needMint = eRwfBal < ethers.parseEther('1000000');
+      if (needMint) {
+        const txHash = await contracts.mintTokens(address, MINT_AMOUNT);
+        console.log(`  ✅ Minted to ${phone} (${address}) tx=${txHash}`);
+      } else {
+        console.log(`  ⏭  Skip mint ${phone} (eRWF balance already sufficient)`);
+      }
     }
 
     // 3. On-chain deals + DB rows in five lifecycle states

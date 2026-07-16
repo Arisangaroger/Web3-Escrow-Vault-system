@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { signAction } = require("./helpers/signatures");
+const { deployEscrowSystem } = require("./helpers/deploy");
 
 describe("Escrow - Multi-Deal Role Switching", function () {
   let token, escrow;
@@ -11,26 +12,16 @@ describe("Escrow - Multi-Deal Role Switching", function () {
   beforeEach(async function () {
     [admin, operator, alice, bob, charlie, relay] = await ethers.getSigners();
 
-    // Deploy contracts
-    const ERWF = await ethers.getContractFactory("eRWF");
-    token = await ERWF.deploy(operator.address);
-    await token.waitForDeployment();
+    ({ token, escrow, escrowAddress, chainId } = await deployEscrowSystem({
+      admin,
+      operator,
+      relay,
+    }));
 
-    const Escrow = await ethers.getContractFactory("Escrow");
-    escrow = await Escrow.deploy(await token.getAddress(), admin.address);
-    await escrow.waitForDeployment();
-    
-    escrowAddress = await escrow.getAddress();
-    chainId = (await ethers.provider.getNetwork()).chainId;
-
-    // Mint tokens to all parties
+    // Mint tokens to all parties (no approve — Escrow pullFrom)
     await token.connect(operator).mint(alice.address, amount * BigInt(3));
     await token.connect(operator).mint(bob.address, amount * BigInt(3));
     await token.connect(operator).mint(charlie.address, amount * BigInt(3));
-
-    await token.connect(alice).approve(escrowAddress, amount * BigInt(3));
-    await token.connect(bob).approve(escrowAddress, amount * BigInt(3));
-    await token.connect(charlie).approve(escrowAddress, amount * BigInt(3));
   });
 
   describe("Same Address, Different Roles", function () {
