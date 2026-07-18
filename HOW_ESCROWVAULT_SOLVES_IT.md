@@ -185,8 +185,8 @@ Users sign a typed message proving intent; a **relay wallet pays the gas** and s
 **`pullFrom` instead of approvals.**
 The Escrow contract holds a dedicated role on the `eRWF` token and pulls funds only after verifying the buyer's signature — removing the confusing multi-step "approve then transfer" pattern entirely.
 
-**Transfer-restricted stablecoin.**
-Direct token transfers are disabled; only the Escrow contract can move `eRWF`. This guarantees locked funds can't leak out of the deal lifecycle.
+**Freely-usable stablecoin, custodied only while locked.**
+`eRWF` is a standard, fully transferable ERC-20 — users own their balance and can hold, receive, or spend it anywhere, just like real money. The **Escrow contract is a separate entity**: when a buyer locks funds for a deal, Escrow (holding a dedicated `ESCROW_ROLE` on the token) uses `pullFrom` to move the exact amount **into the Escrow contract**, where it is held until the deal is released, refunded, or resolved. Crucially, this pull only happens *after* Escrow has verified the owner's signed instruction — so funds can only ever enter escrow with the owner's explicit consent, and everything outside an active deal remains the user's to use freely.
 
 **Battle-tested security primitives.**
 `ReentrancyGuard` on all fund-moving functions, OpenZeppelin `AccessControl` for roles, and an explicit enum **state machine** that rejects invalid transitions at the contract level.
