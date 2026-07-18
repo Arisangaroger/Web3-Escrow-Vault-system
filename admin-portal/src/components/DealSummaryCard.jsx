@@ -12,11 +12,21 @@ const DealSummaryCard = ({ dispute }) => {
     return new Date(date).toLocaleString();
   };
 
+  const status = dispute.status || 'Disputed';
+  const statusClass =
+    status === 'ResolutionPending'
+      ? 'status-resolution-pending'
+      : status === 'Resolved'
+        ? 'status-resolved'
+        : 'status-disputed';
+  const statusText =
+    status === 'ResolutionPending' ? 'Processing' : status;
+
   return (
     <div className="deal-summary-card">
       <div className="card-header">
         <h2>Deal Summary</h2>
-        <span className="status-badge status-disputed">{dispute.status}</span>
+        <span className={`status-badge ${statusClass}`}>{statusText}</span>
       </div>
 
       <div className="card-body">

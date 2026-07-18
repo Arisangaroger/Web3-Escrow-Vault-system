@@ -215,11 +215,13 @@ export class AdminService {
   }
 
   /**
-   * Get all disputed deals
+   * Get all disputed deals (including ones awaiting on-chain confirmation)
    */
   async getDisputedDeals() {
     const deals = await this.prisma.deal.findMany({
-      where: { status: 'Disputed' },
+      where: {
+        status: { in: ['Disputed', 'ResolutionPending'] },
+      },
       include: {
         sender: true,
         driver: true,
@@ -242,7 +244,7 @@ export class AdminService {
   }
 
   /**
-   * Get detailed information about a disputed deal
+   * Get detailed information about a disputed (or resolution-pending) deal
    */
   async getDisputeDetail(dealId: number) {
     const deal = await this.prisma.deal.findUnique({
@@ -265,9 +267,15 @@ export class AdminService {
       throw new BadRequestException('Deal not found');
     }
 
-    if (deal.status !== 'Disputed') {
-      throw new BadRequestException('Deal is not in disputed status');
+    if (deal.status !== 'Disputed' && deal.status !== 'ResolutionPending') {
+      throw new BadRequestException(
+        `Deal is ${deal.status} (expected Disputed or ResolutionPending)`,
+      );
     }
+
+    const pendingLog = [...deal.actionLogs]
+      .reverse()
+      .find((log) => log.action.startsWith('AdminResolution_'));
 
     return {
       dealId: deal.dealId,
@@ -281,6 +289,7 @@ export class AdminService {
       createdAt: deal.createdAt,
       fundLockDeadline: deal.fundLockDeadline,
       payoutReadyTime: deal.payoutReadyTime,
+      pendingTxHash: deal.status === 'ResolutionPending' ? pendingLog?.txHash : null,
       timeline: deal.actionLogs.map((log) => ({
         action: log.action,
         actorPhone: log.actorPhone,
@@ -298,13 +307,14 @@ export class AdminService {
   }
 
   /**
-   * Resolve a dispute — on-chain tx is signed by the relay wallet (ADMIN_ROLE holder).
+   * Resolve a dispute — submit on-chain, mark ResolutionPending until confirmed.
+   * Portal returns immediately; event listener finalizes Resolved.
    */
   async resolveDispute(
     adminId: number,
     dealId: number,
     outcome: ResolutionOutcome,
-  ): Promise<{ txHash: string }> {
+  ): Promise<{ txHash: string; status: string }> {
     const admin = await this.prisma.admin.findUnique({
       where: { adminId },
     });
@@ -319,6 +329,12 @@ export class AdminService {
 
     if (!deal) {
       throw new BadRequestException('Deal not found');
+    }
+
+    if (deal.status === 'ResolutionPending') {
+      throw new BadRequestException(
+        'Resolution already submitted and awaiting blockchain confirmation',
+      );
     }
 
     if (deal.status !== 'Disputed') {
@@ -342,25 +358,38 @@ export class AdminService {
         break;
     }
 
+    // Claim the dispute before broadcasting so two admins cannot double-submit.
+    const claimed = await this.prisma.deal.updateMany({
+      where: { dealId, status: 'Disputed' },
+      data: { status: 'ResolutionPending' },
+    });
+
+    if (claimed.count === 0) {
+      throw new BadRequestException(
+        'Deal is no longer disputed (another resolution may be in progress)',
+      );
+    }
+
     this.logger.log(
       `Resolving dispute ${dealId}: ${outcome} - Sender: ${amountToSender}, Receiver: ${amountToReceiver}`,
     );
 
-    // On-chain: onlyRole(ADMIN_ROLE). Relay/treasury wallet (deployer) holds that role.
-    const txHash = await this.contractsService.resolveDisputeOnChain(
-      dealId,
-      amountToSender,
-      amountToReceiver,
-    );
+    let txHash: string;
+    try {
+      txHash = await this.contractsService.resolveDisputeOnChain(
+        dealId,
+        amountToSender,
+        amountToReceiver,
+      );
+    } catch (error) {
+      // Roll back claim so admin can retry
+      await this.prisma.deal.updateMany({
+        where: { dealId, status: 'ResolutionPending' },
+        data: { status: 'Disputed' },
+      });
+      throw error;
+    }
 
-    // Optimistic local status — do not wait for the chain event listener (~30s).
-    // Listener remains idempotent and still drives SMS notifications.
-    await this.prisma.deal.update({
-      where: { dealId },
-      data: { status: 'Resolved' },
-    });
-
-    // Audit which portal admin decided (identity ≠ relay signer).
     await this.prisma.dealActionLog.create({
       data: {
         dealId,
@@ -372,9 +401,11 @@ export class AdminService {
       },
     });
 
-    this.logger.log(`Dispute ${dealId} resolved by admin ${admin.name}: ${txHash}`);
+    this.logger.log(
+      `Dispute ${dealId} resolution submitted by ${admin.name} (pending confirmation): ${txHash}`,
+    );
 
-    return { txHash };
+    return { txHash, status: 'ResolutionPending' };
   }
 
   /**

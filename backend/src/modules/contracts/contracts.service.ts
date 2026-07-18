@@ -183,7 +183,16 @@ export class ContractsService {
       );
 
       const relayWallet = this.gasRelayService.getTreasuryWallet();
-      const tx = await this.escrowContract.connect(relayWallet).markDelivered(dealId, signature);
+      const connected = this.escrowContract.connect(relayWallet);
+
+      // Surface clear revert reasons instead of ethers "missing revert data"
+      try {
+        await connected.markDelivered.staticCall(dealId, signature);
+      } catch (simError) {
+        throw new Error(this.formatContractError('markDelivered', simError));
+      }
+
+      const tx = await connected.markDelivered(dealId, signature);
       const receipt = await tx.wait();
 
       this.logger.logTransaction('markDelivered', receipt.hash, {
@@ -192,6 +201,9 @@ export class ContractsService {
       });
       return receipt.hash;
     } catch (error) {
+      if (String(error?.message || '').startsWith('markDelivered failed:')) {
+        throw error;
+      }
       throw new Error(this.formatContractError('markDelivered', error));
     }
   }
@@ -301,22 +313,86 @@ export class ContractsService {
       const amountToSenderWei = ethers.parseEther(amountToSender);
       const amountToReceiverWei = ethers.parseEther(amountToReceiver);
       const relayWallet = this.gasRelayService.getTreasuryWallet();
+      const connected = this.escrowContract.connect(relayWallet);
 
-      const tx = await this.escrowContract
-        .connect(relayWallet)
-        .resolveDispute(dealId, amountToSenderWei, amountToReceiverWei);
-      const receipt = await tx.wait();
+      // Validate up-front so the admin gets an instant, clear error instead of
+      // waiting minutes for a revert to surface as "missing revert data".
+      try {
+        await connected.resolveDispute.staticCall(
+          dealId,
+          amountToSenderWei,
+          amountToReceiverWei,
+        );
+      } catch (simError) {
+        throw new Error(this.formatContractError('resolveDispute', simError));
+      }
 
-      this.logger.logTransaction('resolveDispute', receipt.hash, {
+      const tx = await connected.resolveDispute(
+        dealId,
+        amountToSenderWei,
+        amountToReceiverWei,
+      );
+
+      // Do not block the admin HTTP response. Portal shows ResolutionPending
+      // until the event listener confirms DisputeResolved on-chain.
+      void this.waitForConfirmation(tx, 'resolveDispute', {
         dealId,
         amountToSender,
         amountToReceiver,
         admin: relayWallet.address,
       });
-      return receipt.hash;
+      return tx.hash;
     } catch (error) {
+      if (String(error?.message || '').startsWith('resolveDispute failed:')) {
+        throw error;
+      }
       throw new Error(this.formatContractError('resolveDispute', error));
     }
+  }
+
+  /**
+   * Await a tx receipt but cap how long the caller blocks. Final confirmation
+   * (or failure) is always logged in the background so we never lose the record;
+   * on timeout we return early and let the event listener reconcile state.
+   */
+  private waitForConfirmation(
+    tx: ethers.ContractTransactionResponse,
+    action: string,
+    meta: Record<string, unknown>,
+    timeoutMs = 20000,
+  ): Promise<void> {
+    const waitPromise = tx.wait();
+
+    waitPromise.then(
+      (receipt: any) =>
+        this.logger.logTransaction(action, receipt?.hash ?? tx.hash, meta),
+      (err: any) =>
+        this.logger.warn(
+          `${action} confirmation failed after submit (${tx.hash}): ${err?.message || err}`,
+        ),
+    );
+
+    return new Promise<void>((resolve) => {
+      const timer = setTimeout(() => {
+        this.logger.info(`${action} submitted; confirmation still pending`, {
+          txHash: tx.hash,
+          ...meta,
+        });
+        resolve();
+      }, timeoutMs);
+
+      // Settle (resolve/reject) both stop the caller from blocking further.
+      waitPromise.then(
+        () => {
+          clearTimeout(timer);
+          resolve();
+        },
+        () => {
+          clearTimeout(timer);
+          resolve();
+        },
+      );
+    });
   }
 
   async getDealFromChain(dealId: number): Promise<any> {
@@ -366,11 +442,22 @@ export class ContractsService {
   }
 
   private formatContractError(action: string, error: any): string {
+    const rpcMessage =
+      error?.info?.error?.message ||
+      error?.error?.message ||
+      error?.data?.message;
+    const short = error?.shortMessage || '';
+    // Free-tier RPC timeouts often arrive as CALL_EXCEPTION + "missing revert data"
+    // with the real cause only in info.error.message.
+    const opaque =
+      !error?.reason &&
+      (/missing revert data/i.test(short) || error?.code === 'CALL_EXCEPTION');
+
     const reason =
       error?.reason ||
-      error?.shortMessage ||
-      error?.info?.error?.message ||
-      error?.data?.message ||
+      (opaque && rpcMessage ? rpcMessage : null) ||
+      rpcMessage ||
+      short ||
       error?.message ||
       String(error);
     this.logger.error(`${action} failed: ${reason}`);

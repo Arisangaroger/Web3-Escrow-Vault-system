@@ -1,40 +1,81 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getDisputes } from '../api/client';
+
+const POLL_MS = 5000;
+
+const statusLabel = (status) => {
+  if (status === 'ResolutionPending') return 'Processing';
+  if (status === 'Disputed') return 'Disputed';
+  return status || 'Disputed';
+};
+
+const statusClass = (status) => {
+  if (status === 'ResolutionPending') return 'status-resolution-pending';
+  if (status === 'Resolved') return 'status-resolved';
+  return 'status-disputed';
+};
 
 const DisputeQueue = () => {
   const [disputes, setDisputes] = useState([]);
   const [filteredDisputes, setFilteredDisputes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [flash, setFlash] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [reasonFilter, setReasonFilter] = useState('all');
   const { admin, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const pollRef = useRef(null);
 
   useEffect(() => {
-    loadDisputes();
+    if (location.state?.flash) {
+      setFlash(location.state.flash);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, navigate]);
+
+  useEffect(() => {
+    loadDisputes(true);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
   }, []);
 
   useEffect(() => {
     filterDisputes();
   }, [disputes, searchTerm, reasonFilter]);
 
-  const loadDisputes = async () => {
+  useEffect(() => {
+    const hasPending = disputes.some((d) => d.status === 'ResolutionPending');
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    if (hasPending) {
+      pollRef.current = setInterval(() => loadDisputes(false), POLL_MS);
+    }
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [disputes]);
+
+  const loadDisputes = async (showSpinner = false) => {
     try {
-      setLoading(true);
+      if (showSpinner) setLoading(true);
       const response = await getDisputes();
       if (response.success) {
         setDisputes(response.data);
-        setFilteredDisputes(response.data);
+        setError('');
       } else {
         setError(response.error);
       }
     } catch (err) {
       setError('Failed to load disputes');
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
@@ -112,6 +153,12 @@ const DisputeQueue = () => {
       </header>
 
       <main className="dashboard-content">
+        {flash && (
+          <div className="success-banner" role="status">
+            {flash}
+          </div>
+        )}
+
         {!loading && !error && disputes.length > 0 && (
           <div className="filters-section">
             <div className="filter-group">
@@ -177,44 +224,63 @@ const DisputeQueue = () => {
                   <th>Amount</th>
                   <th>Parties</th>
                   <th>Reason</th>
+                  <th>Status</th>
                   <th>Disputed</th>
                   <th>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredDisputes.map((dispute) => (
-                  <tr key={dispute.dealId}>
-                    <td>
-                      <strong>#{dispute.dealId}</strong>
-                    </td>
-                    <td>{formatAmount(dispute.amount)}</td>
-                    <td>
-                      <div className="parties-info">
-                        <div>Sender: {dispute.senderPhone}</div>
-                        <div>Driver: {dispute.driverPhone}</div>
-                        <div>Receiver: {dispute.receiverPhone}</div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className="reason-badge">
-                        {dispute.disputeReasonText}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="time-ago">
-                        {getTimeSince(dispute.createdAt)}
-                      </span>
-                    </td>
-                    <td>
-                      <button
-                        onClick={() => navigate(`/disputes/${dispute.dealId}`)}
-                        className="btn-primary btn-sm"
-                      >
-                        Review
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {filteredDisputes.map((dispute) => {
+                  const pending = dispute.status === 'ResolutionPending';
+                  return (
+                    <tr
+                      key={dispute.dealId}
+                      className={pending ? 'row-resolution-pending' : undefined}
+                    >
+                      <td>
+                        <strong>#{dispute.dealId}</strong>
+                      </td>
+                      <td>{formatAmount(dispute.amount)}</td>
+                      <td>
+                        <div className="parties-info">
+                          <div>Sender: {dispute.senderPhone}</div>
+                          <div>Driver: {dispute.driverPhone}</div>
+                          <div>Receiver: {dispute.receiverPhone}</div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="reason-badge">
+                          {dispute.disputeReasonText}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`status-badge ${statusClass(dispute.status)}`}>
+                          {pending && <span className="spinner spinner-inline" aria-hidden="true" />}
+                          {statusLabel(dispute.status)}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="time-ago">
+                          {getTimeSince(dispute.createdAt)}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          onClick={() => navigate(`/disputes/${dispute.dealId}`)}
+                          className="btn-primary btn-sm"
+                          disabled={pending}
+                          title={
+                            pending
+                              ? 'Resolution already submitted — awaiting confirmation'
+                              : 'Review dispute'
+                          }
+                        >
+                          {pending ? 'Processing…' : 'Review'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

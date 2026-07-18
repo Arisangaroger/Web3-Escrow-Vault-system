@@ -589,6 +589,7 @@
         text: '',
         phoneNumber: defaultNumber,
         canonicalPhone: defaultNumber ? toCanonicalPhone(defaultNumber) : null,
+        idleTimer: null,
       };
 
       if (defaultNumber) startSmsPolling(phoneId);
@@ -633,9 +634,10 @@
         displayMessage(phoneId, message);
 
         if (message.startsWith('END')) {
-          updateStatus(phoneId, 'Session ended', 'ended');
           phones[phoneId].sessionId = null;
+          handleEndResponse(phoneId, message);
         } else {
+          clearIdleReturn(phoneId);
           updateStatus(phoneId, 'Session active', 'active');
         }
 
@@ -687,10 +689,11 @@
         document.getElementById(`${phoneId}-input`).value = '';
 
         if (message.startsWith('END')) {
-          updateStatus(phoneId, 'Session ended', 'ended');
           phones[phoneId].sessionId = null;
           phones[phoneId].text = '';
+          handleEndResponse(phoneId, message);
         } else {
+          clearIdleReturn(phoneId);
           updateStatus(phoneId, 'Session active', 'active');
         }
       } catch (error) {
@@ -700,7 +703,35 @@
       }
     }
 
+    function isProcessingEndMessage(message) {
+      const body = message.replace(/^END\s/, '');
+      return /SMS when complete/i.test(body) || /Processing/i.test(body);
+    }
+
+    function clearIdleReturn(phoneId) {
+      const phone = phones[phoneId];
+      if (phone?.idleTimer) {
+        clearTimeout(phone.idleTimer);
+        phone.idleTimer = null;
+      }
+    }
+
+    function handleEndResponse(phoneId, message) {
+      clearIdleReturn(phoneId);
+
+      if (isProcessingEndMessage(message)) {
+        updateStatus(phoneId, 'Processing… returning to idle', 'ended');
+        phones[phoneId].idleTimer = setTimeout(() => {
+          endSession(phoneId);
+        }, 5000);
+        return;
+      }
+
+      updateStatus(phoneId, 'Session ended', 'ended');
+    }
+
     function endSession(phoneId) {
+      clearIdleReturn(phoneId);
       phones[phoneId].sessionId = null;
       phones[phoneId].text = '';
       document.getElementById(`${phoneId}-input`).value = '';

@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { getDisputeDetail, resolveDispute } from '../api/client';
 import ConfirmModal from './ConfirmModal';
 
-const ResolutionPanel = ({ dealId, onComplete }) => {
+const ResolutionPanel = ({ dealId, status, pendingTxHash, onSubmitted }) => {
   const [selectedOutcome, setSelectedOutcome] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [error, setError] = useState('');
+
+  const isPending = status === 'ResolutionPending';
 
   const outcomes = [
     {
@@ -45,12 +47,19 @@ const ResolutionPanel = ({ dealId, onComplete }) => {
     setError('');
 
     try {
-      // Re-fetch deal status to ensure it's still disputed (safety check)
       const detailResponse = await getDisputeDetail(dealId);
-      
+
       if (!detailResponse.success) {
         setError('Failed to verify deal status');
         setResolving(false);
+        return;
+      }
+
+      if (detailResponse.data.status === 'ResolutionPending') {
+        setError('Resolution already submitted and awaiting confirmation');
+        setResolving(false);
+        setShowConfirm(false);
+        onSubmitted?.({ status: 'ResolutionPending' });
         return;
       }
 
@@ -58,17 +67,14 @@ const ResolutionPanel = ({ dealId, onComplete }) => {
         setError(`Cannot resolve: Deal is now in ${detailResponse.data.status} status`);
         setResolving(false);
         setShowConfirm(false);
-        // Refresh page to show current state
-        setTimeout(() => window.location.reload(), 2000);
         return;
       }
 
-      // Proceed with resolution
       const response = await resolveDispute(dealId, selectedOutcome.value);
 
       if (response.success) {
         setShowConfirm(false);
-        onComplete();
+        onSubmitted?.(response.data);
       } else {
         setError(response.error || 'Resolution failed');
       }
@@ -84,6 +90,34 @@ const ResolutionPanel = ({ dealId, onComplete }) => {
     setSelectedOutcome(null);
     setError('');
   };
+
+  if (isPending) {
+    return (
+      <div className="resolution-panel">
+        <div className="panel-header">
+          <h2>Resolution Pending</h2>
+          <p>Waiting for blockchain confirmation</p>
+        </div>
+        <div className="panel-content">
+          <div className="pending-resolution-banner">
+            <div className="spinner spinner-sm"></div>
+            <div>
+              <strong>Processing on-chain…</strong>
+              <p>
+                Resolution was submitted. Confirmation on Polygon Amoy can take a
+                few minutes. This dispute will move to History once confirmed.
+              </p>
+              {pendingTxHash && (
+                <p className="pending-tx">
+                  Tx: <code>{pendingTxHash}</code>
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="resolution-panel">
@@ -115,9 +149,8 @@ const ResolutionPanel = ({ dealId, onComplete }) => {
         <div className="panel-warning">
           <strong>⚠️ Warning:</strong>
           <p>
-            Resolution actions are irreversible and immediately move funds on the
-            blockchain. Ensure you have investigated the dispute thoroughly before
-            proceeding.
+            Resolution actions are irreversible once confirmed on the blockchain.
+            Ensure you have investigated the dispute thoroughly before proceeding.
           </p>
         </div>
       </div>
@@ -125,8 +158,8 @@ const ResolutionPanel = ({ dealId, onComplete }) => {
       {showConfirm && (
         <ConfirmModal
           title="Confirm Resolution"
-          message={`Are you sure you want to resolve this dispute as "${selectedOutcome.label}"? This action cannot be undone.`}
-          details={selectedOutcome.description}
+          message={`Resolve this dispute as "${selectedOutcome.label}"?`}
+          details="The transaction will be submitted now. Blockchain confirmation can take a few minutes — you'll return to the queue where this dispute shows as Processing until it is confirmed."
           onConfirm={handleConfirm}
           onCancel={handleCancel}
           loading={resolving}

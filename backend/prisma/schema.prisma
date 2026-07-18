@@ -33,6 +33,7 @@ enum DealStatus {
   Shipped
   Delivered
   Disputed
+  ResolutionPending
   Released
   Cancelled
   Resolved

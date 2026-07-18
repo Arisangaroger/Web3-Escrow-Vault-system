@@ -52,7 +52,16 @@ class EnterDisputePinNode extends MenuNode {
           }
         })
         .catch((error) => {
-          log.error('Menu error', error);
+          // Amoy confirmations can exceed the client wait; USSD already ended.
+          // Backend often still completes (check SMS / deal status).
+          if (error?.code === 'ECONNABORTED' || /timeout/i.test(error?.message || '')) {
+            log.warn('Background revoke still pending (client wait timed out)', {
+              dealId,
+              message: error.message,
+            });
+            return;
+          }
+          log.error('Background revoke error', error);
         });
 
       sessionStore.clearContext(session.sessionId);

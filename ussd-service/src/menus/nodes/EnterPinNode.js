@@ -74,6 +74,14 @@ class EnterPinNode extends MenuNode {
           }
         })
         .catch((error) => {
+          if (error?.code === 'ECONNABORTED' || /timeout/i.test(error?.message || '')) {
+            log.warn('Background action still pending (client wait timed out)', {
+              action,
+              dealId,
+              message: error.message,
+            });
+            return;
+          }
           log.error('Background action error', error, { action });
         });
 

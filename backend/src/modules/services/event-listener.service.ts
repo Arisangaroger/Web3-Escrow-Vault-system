@@ -189,6 +189,7 @@ export class EventListenerService implements OnModuleInit {
               DealStatus.Shipped,
               DealStatus.Delivered,
               DealStatus.Disputed,
+              DealStatus.ResolutionPending,
             ],
           },
         },
@@ -201,7 +202,16 @@ export class EventListenerService implements OnModuleInit {
         try {
           const onChain = await this.contractsService.getDealFromChain(deal.dealId);
           const onChainStatus = STATUS_BY_INDEX[Number(onChain.status)];
-          if (!onChainStatus || onChainStatus === deal.status) continue;
+          if (!onChainStatus) continue;
+
+          // ResolutionPending is off-chain only: keep waiting while chain is still Disputed;
+          // promote to Resolved when confirmed; otherwise adopt chain status.
+          if (deal.status === DealStatus.ResolutionPending) {
+            if (onChainStatus === DealStatus.Disputed) continue;
+            // fall through to update (typically Resolved)
+          } else if (onChainStatus === deal.status) {
+            continue;
+          }
 
           const data: any = {
             status: onChainStatus,

@@ -1,5 +1,9 @@
 const axios = require('axios');
 
+/** Amoy confirmations often exceed 15s; USSD menus fire-and-forget these. */
+const CHAIN_TIMEOUT_MS = 90_000;
+const QUICK_TIMEOUT_MS = 15_000;
+
 /**
  * Client for Phase 2 Backend API
  * All business logic lives in backend - this is just a thin HTTP wrapper
@@ -8,8 +12,8 @@ class BackendClient {
   constructor(baseURL) {
     this.client = axios.create({
       baseURL,
-      // Quick calls (pin-status, verify-pin, notifications). Chain actions use fire-and-forget from menus.
-      timeout: 15000,
+      // Quick calls (pin-status, verify-pin, notifications). Chain actions override timeout.
+      timeout: QUICK_TIMEOUT_MS,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -47,54 +51,78 @@ class BackendClient {
   }
 
   async createDeal(senderPhone, driverPhone, receiverPhone, amount, pin) {
-    const response = await this.client.post('/deals', {
-      senderPhone,
-      driverPhone,
-      receiverPhone,
-      amount,
-      pin,
-    });
+    const response = await this.client.post(
+      '/deals',
+      {
+        senderPhone,
+        driverPhone,
+        receiverPhone,
+        amount,
+        pin,
+      },
+      { timeout: CHAIN_TIMEOUT_MS },
+    );
     return response.data;
   }
 
   async lockFunds(phoneNumber, dealId, pin) {
-    const response = await this.client.post(`/deals/${dealId}/lock`, {
-      phone: phoneNumber,
-      pin,
-    });
+    const response = await this.client.post(
+      `/deals/${dealId}/lock`,
+      {
+        phone: phoneNumber,
+        pin,
+      },
+      { timeout: CHAIN_TIMEOUT_MS },
+    );
     return response.data;
   }
 
   async markShipped(phoneNumber, dealId, pin) {
-    const response = await this.client.post(`/deals/${dealId}/ship`, {
-      phone: phoneNumber,
-      pin,
-    });
+    const response = await this.client.post(
+      `/deals/${dealId}/ship`,
+      {
+        phone: phoneNumber,
+        pin,
+      },
+      { timeout: CHAIN_TIMEOUT_MS },
+    );
     return response.data;
   }
 
   async markDelivered(phoneNumber, dealId, pin) {
-    const response = await this.client.post(`/deals/${dealId}/deliver`, {
-      phone: phoneNumber,
-      pin,
-    });
+    const response = await this.client.post(
+      `/deals/${dealId}/deliver`,
+      {
+        phone: phoneNumber,
+        pin,
+      },
+      { timeout: CHAIN_TIMEOUT_MS },
+    );
     return response.data;
   }
 
   async revokeDeal(phoneNumber, dealId, reasonCode, pin) {
-    const response = await this.client.post(`/deals/${dealId}/revoke`, {
-      phone: phoneNumber,
-      reasonCode,
-      pin,
-    });
+    const response = await this.client.post(
+      `/deals/${dealId}/revoke`,
+      {
+        phone: phoneNumber,
+        reasonCode,
+        pin,
+      },
+      { timeout: CHAIN_TIMEOUT_MS },
+    );
     return response.data;
   }
 
   async cancelDeal(phoneNumber, dealId, pin) {
-    const response = await this.client.post(`/deals/${dealId}/cancel`, {
-      phone: phoneNumber,
-      pin,
-    });
+    const response = await this.client.post(
+      `/deals/${dealId}/cancel`,
+      {
+        phone: phoneNumber,
+        pin,
+      },
+      { timeout: CHAIN_TIMEOUT_MS },
+    );
     return response.data;
   }
 

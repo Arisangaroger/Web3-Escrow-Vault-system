@@ -23,6 +23,7 @@ const mockDisputes = [
     driverPhone: '0788222222',
     receiverPhone: '0788333333',
     disputeReasonText: 'Goods not received',
+    status: 'Disputed',
     createdAt: new Date().toISOString(),
   },
   {
@@ -32,6 +33,7 @@ const mockDisputes = [
     driverPhone: '0788555555',
     receiverPhone: '0788666666',
     disputeReasonText: 'Damaged goods',
+    status: 'ResolutionPending',
     createdAt: new Date().toISOString(),
   },
 ];
@@ -78,6 +80,22 @@ describe('DisputeQueue Component', () => {
       expect(screen.getByText('#1')).toBeInTheDocument();
       expect(screen.getAllByText(/goods not received/i).length).toBeGreaterThan(0);
       expect(screen.getByRole('button', { name: /review/i })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: /status/i })).toBeInTheDocument();
+    });
+  });
+
+  it('shows Processing status for ResolutionPending disputes', async () => {
+    api.getDisputes.mockResolvedValue({
+      success: true,
+      data: [mockDisputes[1]],
+    });
+
+    renderWithRouter(<DisputeQueue />);
+
+    await waitFor(() => {
+      expect(screen.getByText('#2')).toBeInTheDocument();
+      expect(screen.getByText(/^Processing$/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /processing/i })).toBeDisabled();
     });
   });
 

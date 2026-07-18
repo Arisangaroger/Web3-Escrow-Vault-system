@@ -11,6 +11,7 @@ const DisputeDetail = () => {
   const [dispute, setDispute] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [submittedNotice, setSubmittedNotice] = useState('');
 
   useEffect(() => {
     loadDispute();
@@ -32,8 +33,20 @@ const DisputeDetail = () => {
     }
   };
 
-  const handleResolutionComplete = () => {
-    navigate('/');
+  const handleResolutionSubmitted = (data) => {
+    setSubmittedNotice(
+      'Resolution submitted. Returning to the queue — confirmation can take a few minutes.',
+    );
+    // Brief notice, then back to dashboard where the row shows Processing.
+    setTimeout(() => {
+      navigate('/', {
+        state: {
+          flash: 'Resolution submitted. Awaiting blockchain confirmation.',
+          pendingDealId: Number(dealId),
+          txHash: data?.txHash,
+        },
+      });
+    }, 1200);
   };
 
   if (loading) {
@@ -66,6 +79,10 @@ const DisputeDetail = () => {
         <h1>Dispute #{dispute.dealId}</h1>
       </header>
 
+      {submittedNotice && (
+        <div className="success-banner">{submittedNotice}</div>
+      )}
+
       <div className="detail-content">
         <div className="detail-main">
           <DealSummaryCard dispute={dispute} />
@@ -75,7 +92,9 @@ const DisputeDetail = () => {
         <div className="detail-sidebar">
           <ResolutionPanel
             dealId={dispute.dealId}
-            onComplete={handleResolutionComplete}
+            status={dispute.status}
+            pendingTxHash={dispute.pendingTxHash}
+            onSubmitted={handleResolutionSubmitted}
           />
         </div>
       </div>
