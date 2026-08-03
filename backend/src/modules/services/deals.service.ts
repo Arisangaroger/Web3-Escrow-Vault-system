@@ -56,8 +56,18 @@ export class DealsService {
     // Store in database (will be updated by event listener)
     const fundLockDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000);
     
-    await this.prisma.deal.create({
-      data: {
+    await this.prisma.deal.upsert({
+      where: { dealId },
+      update: {
+        senderPhone,
+        driverPhone,
+        receiverPhone,
+        amount,
+        status: DealStatus.Created,
+        fundLockDeadline,
+        txHashCreated: txHash,
+      },
+      create: {
         dealId,
         senderPhone,
         driverPhone,

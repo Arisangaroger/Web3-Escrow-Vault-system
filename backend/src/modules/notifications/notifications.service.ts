@@ -1,13 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { PrismaService } from '../db/prisma.service';
 import { NotificationStatus } from '@prisma/client';
 import { LoggerService } from '../../common/logger.service';
+import { NotificationsGateway } from './notifications.gateway';
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new LoggerService(NotificationsService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    // Optional so unit tests don't need a full WS server
+    @Optional() private readonly gateway?: NotificationsGateway,
+  ) {}
 
   /**
    * Send notification (simulated - writes to DB and console)
@@ -18,7 +23,7 @@ export class NotificationsService {
     dealId?: number,
   ): Promise<void> {
     // Write to notifications_log
-    await this.prisma.notificationLog.create({
+    const record = await this.prisma.notificationLog.create({
       data: {
         recipientPhone: phoneNumber,
         message,
@@ -29,6 +34,16 @@ export class NotificationsService {
 
     // Log to console (simulates SMS gateway)
     this.logger.log(`📱 SMS to ${phoneNumber}: ${message}`);
+
+    // Push to any connected simulator phones in real-time via WebSocket
+    this.gateway?.pushNotification(phoneNumber, {
+      id: record.id,
+      dealId: record.dealId ?? undefined,
+      recipientPhone: phoneNumber,
+      message: record.message,
+      sentAt: record.sentAt.toISOString(),
+      deliveryStatus: record.deliveryStatus,
+    });
   }
 
   /**

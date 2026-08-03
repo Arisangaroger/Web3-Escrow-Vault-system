@@ -33,7 +33,7 @@ describe('Admin Portal E2E Tests', () => {
         walletAddress: '0xTestWalletAddress',
       },
     });
-  });
+  }, 60000);
 
   afterAll(async () => {
     // Cleanup
@@ -41,7 +41,7 @@ describe('Admin Portal E2E Tests', () => {
       where: { email: 'test@admin.com' },
     });
     await app.close();
-  });
+  }, 60000);
 
   describe('Admin Authentication', () => {
     it('POST /admin/login - should login successfully', () => {
@@ -193,7 +193,7 @@ describe('Admin Portal E2E Tests', () => {
       });
 
       testDealId = deal.dealId;
-    });
+    }, 30000);
 
     afterAll(async () => {
       // Cleanup
@@ -207,7 +207,7 @@ describe('Admin Portal E2E Tests', () => {
           },
         },
       });
-    });
+    }, 30000);
 
     it('GET /admin/disputes - should return disputed deals', async () => {
       // First login to get token

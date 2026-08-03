@@ -6,819 +6,657 @@
   <title>Escrow USSD Handset Lab</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Fragment+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Afacad:ital,wght@0,400..700;1,400..700&family=Outfit:wght@100..900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --ink: #1a211c;
-      --ink-soft: #3d4a42;
-      --paper: #e8efe6;
-      --moss: #2f6b4f;
-      --moss-deep: #1e4634;
-      --clay: #c45c26;
-      --lcd: #9bb57a;
-      --lcd-dark: #1f2e18;
-      --chassis: #2a2f2c;
-      --chassis-edge: #141816;
-      --bezel: #0d0f0e;
-      --key: #3a4140;
-      --key-text: #eef3ea;
-      --danger: #b33a2b;
-      --shadow: rgba(12, 18, 14, 0.45);
-      --ease: cubic-bezier(0.22, 1, 0.36, 1);
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { height: 100%; overflow: hidden; }
 
     body {
-      min-height: 100vh;
-      font-family: "Bricolage Grotesque", sans-serif;
-      color: var(--ink);
-      background:
-        radial-gradient(ellipse 80% 50% at 10% -10%, rgba(47, 107, 79, 0.35), transparent 55%),
-        radial-gradient(ellipse 60% 40% at 100% 0%, rgba(196, 92, 38, 0.2), transparent 50%),
-        linear-gradient(165deg, #c5d1c0 0%, #9eae9a 42%, #7d8f78 100%);
-      background-attachment: fixed;
-    }
-
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      opacity: 0.07;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-      z-index: 0;
+      height: 100%;
+      font-family: 'Outfit', system-ui, sans-serif;
+      color: #1E293B;
+      background: #DDE3EC;
+      background-image:
+        radial-gradient(ellipse at 10% 10%, rgba(16,185,129,0.07) 0, transparent 55%),
+        radial-gradient(ellipse at 90% 90%, rgba(99,102,241,0.06) 0, transparent 55%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow: hidden;
     }
 
     .lab {
-      position: relative;
-      z-index: 1;
-      max-width: 980px;
-      margin: 0 auto;
-      padding: 16px 14px 28px;
+      width: 100%;
+      max-width: 1280px;
+      height: 100%;
+      padding: 0.5rem 1.5rem 0.3rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
     }
 
+    /* ── HEADER ───────────────────────────────────── */
     .masthead {
-      display: grid;
-      gap: 4px;
-      margin-bottom: 16px;
-      animation: rise 0.7s var(--ease) both;
-    }
-
-    .masthead .eyebrow {
-      font-size: 0.65rem;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: var(--ink-soft);
-      font-weight: 700;
-    }
-
-    .masthead h1 {
-      font-size: clamp(1.35rem, 2.8vw, 1.85rem);
-      line-height: 1.1;
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      max-width: 18ch;
-    }
-
-    .masthead .lede {
-      max-width: 48ch;
-      color: var(--ink-soft);
-      font-size: 0.85rem;
-      line-height: 1.4;
-    }
-
-    .shortcode-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 4px;
-      padding: 5px 10px;
-      width: fit-content;
-      background: var(--ink);
-      color: var(--paper);
-      border-radius: 3px;
-      font-family: "Fragment Mono", monospace;
-      font-size: 0.8rem;
-    }
-
-    .shortcode-chip span {
-      opacity: 0.55;
-      font-size: 0.6rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      font-family: "Bricolage Grotesque", sans-serif;
-    }
-
-    .bench {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 240px));
-      gap: 14px;
-      justify-content: center;
-      align-items: start;
-    }
-
-    @media (max-width: 820px) {
-      .bench {
-        grid-template-columns: minmax(0, 260px);
-        max-width: 280px;
-        margin: 0 auto;
-      }
-    }
-
-    .handset-wrap {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      max-width: 240px;
-      width: 100%;
-      animation: rise 0.8s var(--ease) both;
-    }
-
-    .handset-wrap:nth-child(2) { animation-delay: 0.08s; }
-    .handset-wrap:nth-child(3) { animation-delay: 0.16s; }
-
-    .role-tag {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      padding: 0 4px;
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: var(--ink-soft);
-    }
-
-    .role-tag em {
-      font-style: normal;
-      font-family: "Fragment Mono", monospace;
-      font-weight: 400;
-      letter-spacing: 0;
-      text-transform: none;
-      opacity: 0.7;
-      font-size: 0.62rem;
-    }
-
-    .handset {
-      background: linear-gradient(160deg, #3a403c 0%, var(--chassis) 35%, var(--chassis-edge) 100%);
-      border-radius: 16px;
-      padding: 10px 10px 12px;
-      border: 1px solid rgba(255,255,255,0.08);
-      box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.12),
-        0 12px 24px var(--shadow),
-        0 1px 0 #050606;
-      position: relative;
-      transition: transform 0.35s var(--ease);
-    }
-
-    .handset:focus-within {
-      transform: translateY(-2px);
-    }
-
-    .speaker {
-      width: 48px;
-      height: 4px;
-      margin: 2px auto 8px;
-      border-radius: 99px;
-      background: #0a0b0a;
-      box-shadow: inset 0 1px 2px rgba(255,255,255,0.15);
-    }
-
-    .msisdn {
-      display: grid;
-      gap: 2px;
-      margin-bottom: 8px;
-      padding: 0 2px;
-    }
-
-    .msisdn label {
-      font-size: 0.55rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: rgba(238, 243, 234, 0.55);
-      font-weight: 700;
-    }
-
-    .msisdn input {
-      width: 100%;
-      background: rgba(0,0,0,0.35);
-      border: 1px solid rgba(255,255,255,0.08);
-      color: var(--key-text);
-      font-family: "Fragment Mono", monospace;
-      font-size: 0.78rem;
-      padding: 5px 7px;
-      border-radius: 5px;
-      outline: none;
-    }
-
-    .msisdn input:focus {
-      border-color: rgba(155, 181, 122, 0.7);
-    }
-
-    .lcd-shell {
-      background: var(--bezel);
-      border-radius: 8px;
-      padding: 6px;
-      margin-bottom: 8px;
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
-    }
-
-    .lcd {
-      background: linear-gradient(180deg, #b4cb94 0%, var(--lcd) 55%, #87a066 100%);
-      color: var(--lcd-dark);
-      border-radius: 3px;
-      min-height: 108px;
-      max-height: 132px;
-      overflow-y: auto;
-      padding: 6px 8px;
-      font-family: "Fragment Mono", monospace;
-      font-size: 11px;
-      line-height: 1.35;
-      white-space: pre-wrap;
-      word-break: break-word;
-      position: relative;
-      box-shadow: inset 0 0 20px rgba(30, 50, 20, 0.18);
-    }
-
-    .lcd::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 2px,
-        rgba(20, 35, 15, 0.04) 2px,
-        rgba(20, 35, 15, 0.04) 3px
-      );
-      pointer-events: none;
-    }
-
-    .lcd.empty { color: rgba(31, 46, 24, 0.45); }
-
-    .lcd.flash { animation: lcdPulse 0.35s var(--ease); }
-
-    .lcd-status {
-      font-size: 9px;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      font-weight: 500;
-      margin-bottom: 4px;
-      padding-bottom: 3px;
-      border-bottom: 1px solid rgba(31, 46, 24, 0.2);
-      color: rgba(31, 46, 24, 0.7);
-    }
-
-    .lcd-status.active { color: var(--moss-deep); }
-    .lcd-status.ended { color: var(--danger); }
-    .lcd-status.error { color: #7a2e18; }
-
-    .soft-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 5px;
-      margin-bottom: 7px;
-    }
-
-    .soft {
-      border: none;
-      cursor: pointer;
-      font-family: "Bricolage Grotesque", sans-serif;
-      font-weight: 700;
-      font-size: 0.62rem;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      padding: 6px 4px;
-      border-radius: 4px;
-      color: var(--key-text);
-      transition: transform 0.12s var(--ease), filter 0.12s;
-    }
-
-    .soft:active { transform: scale(0.97); }
-    .soft-dial { background: var(--moss); }
-    .soft-send { background: #3d5c8a; }
-    .soft-end { background: var(--danger); }
-    .soft:hover { filter: brightness(1.08); }
-
-    .digit-field {
-      width: 100%;
-      margin-bottom: 6px;
-      padding: 6px 8px;
-      border-radius: 4px;
-      border: 1px solid rgba(255,255,255,0.1);
-      background: rgba(0,0,0,0.4);
-      color: #d7e4cf;
-      font-family: "Fragment Mono", monospace;
-      font-size: 0.85rem;
-      letter-spacing: 0.06em;
-      outline: none;
-    }
-
-    .digit-field::placeholder {
-      color: rgba(215, 228, 207, 0.35);
-      letter-spacing: 0;
-    }
-
-    .keypad {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 4px;
-    }
-
-    .key {
-      appearance: none;
-      border: none;
-      cursor: pointer;
-      background: linear-gradient(180deg, #4a5250 0%, var(--key) 100%);
-      color: var(--key-text);
-      border-radius: 4px;
-      height: 28px;
-      aspect-ratio: auto;
-      font-family: "Fragment Mono", monospace;
-      font-size: 0.85rem;
-      font-weight: 500;
-      box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.12),
-        0 2px 0 #101211;
-      transition: transform 0.1s var(--ease), box-shadow 0.1s;
-      display: grid;
-      place-content: center;
-      line-height: 1;
-    }
-
-    .key:active {
-      transform: translateY(1px);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 1px 0 #101211;
-    }
-
-    .mic {
-      width: 28px;
-      height: 3px;
-      margin: 8px auto 0;
-      border-radius: 99px;
-      background: rgba(0,0,0,0.55);
-    }
-
-    .sms-panel {
-      background: rgba(26, 33, 28, 0.88);
-      color: var(--paper);
-      border-radius: 8px;
-      padding: 8px;
-      border: 1px solid rgba(255,255,255,0.06);
-      max-height: 100px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .sms-panel header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 0.58rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      font-weight: 700;
-      opacity: 0.7;
+      border-bottom: 1px solid rgba(0,0,0,0.08);
+      padding-bottom: 0.38rem;
+      flex-shrink: 0;
     }
+    .title-area { display: flex; align-items: center; gap: 0.75rem; }
+    .masthead h1 { font-size: 1.05rem; font-weight: 800; letter-spacing: -0.02em; color: #0F172A; }
+    .eyebrow {
+      font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: #10B981;
+      background: rgba(16,185,129,0.1); padding: 0.1rem 0.4rem; border-radius: 99px;
+    }
+    .header-actions { display: flex; align-items: center; gap: 0.6rem; }
 
-    .sms-count {
-      font-family: "Fragment Mono", monospace;
-      opacity: 1;
-      color: #b8d39a;
-      letter-spacing: 0;
-      text-transform: none;
-      font-size: 0.68rem;
+    /* WS status pill */
+    .ws-pill {
+      display: flex; align-items: center; gap: 0.28rem;
+      background: #FFF; border: 1px solid rgba(0,0,0,0.06);
+      border-radius: 6px; padding: 0.18rem 0.55rem;
     }
+    .ws-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #94A3B8; transition: background 0.3s; flex-shrink: 0;
+    }
+    .ws-dot.ok    { background: #10B981; box-shadow: 0 0 5px rgba(16,185,129,0.5); }
+    .ws-dot.err   { background: #EF4444; }
+    .ws-lbl { font-size: 0.6rem; font-weight: 600; color: #64748B; font-family: 'Afacad', sans-serif; }
 
-    .sms-list {
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      min-height: 28px;
+    .shortcode-badge {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      background: #FFF; border: 1px solid rgba(0,0,0,0.07);
+      border-radius: 6px; padding: 0.18rem 0.5rem;
     }
-
-    .sms-empty {
-      font-size: 0.68rem;
-      opacity: 0.45;
-      font-family: "Fragment Mono", monospace;
-    }
-
-    .sms-item {
-      background: rgba(255,255,255,0.06);
-      border-left: 2px solid #b8d39a;
-      padding: 4px 6px;
-      border-radius: 0 4px 4px 0;
-      font-size: 0.62rem;
-      line-height: 1.3;
-      animation: smsIn 0.35s var(--ease) both;
-    }
-
-    .sms-item time {
-      display: block;
-      margin-top: 2px;
-      font-size: 0.55rem;
-      opacity: 0.45;
-      font-family: "Fragment Mono", monospace;
-    }
-
-    .dock {
-      margin-top: 18px;
-      display: flex;
-      justify-content: center;
-      animation: rise 0.9s var(--ease) 0.2s both;
-    }
+    .shortcode-label { font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748B; font-family: 'Afacad', sans-serif; }
+    .shortcode-value { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; font-weight: 700; color: #10B981; }
 
     .add-btn {
-      border: 1.5px dashed rgba(26, 33, 28, 0.35);
-      background: rgba(232, 239, 230, 0.55);
-      color: var(--ink);
-      font-family: "Bricolage Grotesque", sans-serif;
-      font-weight: 700;
-      font-size: 0.8rem;
-      padding: 8px 16px;
-      border-radius: 999px;
-      cursor: pointer;
-      transition: background 0.2s, border-color 0.2s, transform 0.2s var(--ease);
+      background: rgba(16,185,129,0.09); border: 1px dashed rgba(16,185,129,0.45);
+      color: #059669; font-family: inherit; font-weight: 600; font-size: 0.72rem;
+      padding: 0.25rem 0.8rem; border-radius: 99px; cursor: pointer; transition: background 0.2s;
+    }
+    .add-btn:hover { background: rgba(16,185,129,0.15); }
+
+    /* ── BENCH ─────────────────────────────────────── */
+    .bench {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap: 0.75rem;
+      flex: 1 1 0;
+      align-items: start;
+      min-height: 0;
     }
 
-    .add-btn:hover {
-      background: var(--paper);
-      border-color: var(--moss);
-      transform: translateY(-1px);
+    /* ── PHONE COLUMN ──────────────────────────────── */
+    .phone-col { display: flex; flex-direction: column; align-items: center; gap: 0.38rem; }
+
+    .role-tag { width: 100%; display: flex; justify-content: center; align-items: center; }
+    .role-name { display: none; }
+    .role-badge {
+      font-size: 0.78rem; color: #059669; background: rgba(16,185,129,0.1);
+      border-radius: 99px; padding: 0.08rem 0.6rem; font-weight: 600; font-family: 'Afacad', sans-serif;
     }
 
-    .hint {
-      text-align: center;
-      margin-top: 10px;
-      font-size: 0.72rem;
-      color: var(--ink-soft);
-      opacity: 0.85;
+    /* ── SMS INBOX ─────────────────────────────────── */
+    .sms-panel {
+      width: 100%; background: #FFFFFF; border: 1px solid rgba(0,0,0,0.06);
+      border-radius: 9px; padding: 0.35rem 0.55rem;
+      display: flex; flex-direction: column; gap: 0.18rem;
+      font-family: 'Afacad', sans-serif; flex-shrink: 0;
+    }
+    .sms-header { display: flex; justify-content: space-between; align-items: center; }
+    .sms-title { display: flex; align-items: center; gap: 0.28rem; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748B; }
+    .sms-count { font-size: 0.58rem; font-weight: 700; background: #F1F5F9; color: #64748B; padding: 0.03rem 0.38rem; border-radius: 99px; }
+    .sms-count.active { background: #10B981; color: #FFF; }
+    .sms-list { max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.18rem; }
+    .sms-list::-webkit-scrollbar { width: 2px; }
+    .sms-list::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 2px; }
+    .sms-empty { font-size: 0.65rem; color: #94A3B8; text-align: center; padding: 0.25rem 0; font-style: italic; }
+    .sms-item {
+      background: #F0FDF4; border-left: 2px solid #10B981;
+      padding: 0.2rem 0.4rem; border-radius: 0 4px 4px 0;
+      font-size: 0.67rem; line-height: 1.25; color: #1E293B;
+      animation: smsIn 0.25s ease both;
+    }
+    .sms-item time { display: block; font-size: 0.55rem; color: #94A3B8; font-family: 'JetBrains Mono', monospace; }
+
+    /* ═══════════════════════════════════════════════
+       FEATURE PHONE  — reference image match
+       Dark charcoal body · chrome rim · rectangular keys
+    ═══════════════════════════════════════════════ */
+    .phone {
+      position: relative;
+      width: 158px;
+      background: linear-gradient(175deg, #3A3A3A 0%, #242424 30%, #1C1C1C 100%);
+      border-radius: 16px 16px 14px 14px;
+      box-shadow:
+        0 0 0 2px #8A8A8A,
+        0 0 0 3px #444,
+        0 12px 35px rgba(0,0,0,0.5),
+        0 4px 8px rgba(0,0,0,0.4),
+        inset 0 1px 0 rgba(255,255,255,0.1),
+        inset 0 -1px 0 rgba(0,0,0,0.5);
+      padding: 7px 7px 8px;
+      display: flex; flex-direction: column; gap: 4px;
+      flex-shrink: 0; user-select: none;
     }
 
-    @keyframes rise {
-      from { opacity: 0; transform: translateY(18px); }
-      to { opacity: 1; transform: translateY(0); }
+    /* earpiece + camera */
+    .ph-top-row { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 1px; }
+    .ph-camera { width: 5px; height: 5px; background: radial-gradient(circle at 35% 35%, #555, #111); border-radius: 50%; border: 1px solid #333; box-shadow: 0 0 2px rgba(0,0,0,0.8); }
+    .ph-ear {
+      width: 42px; height: 4px; border-radius: 2px; margin: 0 auto 1px;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.8), 0 1px 0 rgba(255,255,255,0.04);
+      background-image: repeating-linear-gradient(90deg, #111 0px, #111 2px, #2a2a2a 2px, #2a2a2a 4px);
     }
 
-    @keyframes lcdPulse {
-      0% { filter: brightness(1); }
-      40% { filter: brightness(1.15); }
-      100% { filter: brightness(1); }
+    /* screen bezel */
+    .ph-bezel {
+      background: #111; border-radius: 5px; padding: 3px;
+      box-shadow: inset 0 2px 5px rgba(0,0,0,0.9), inset 0 -1px 2px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.04);
     }
+    .ph-statusbar { display: none; }
+
+    /* LCD */
+    .ph-lcd {
+      background: #B8C8A0; border-radius: 2px; height: 95px;
+      overflow-y: auto; padding: 4px 5px;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; line-height: 1.35; color: #0D1A00;
+      display: flex; flex-direction: column; gap: 2px;
+      background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.025) 2px, rgba(0,0,0,0.025) 3px);
+    }
+    .ph-lcd::-webkit-scrollbar { width: 2px; }
+    .ph-lcd::-webkit-scrollbar-thumb { background: rgba(13,26,0,0.2); border-radius: 1px; }
+    .ph-lcd-meta { display: flex; justify-content: space-between; font-size: 0.5rem; color: rgba(13,26,0,0.55); padding-bottom: 2px; border-bottom: 1px solid rgba(13,26,0,0.18); margin-bottom: 1px; flex-shrink: 0; }
+    .ph-lcd-status { font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+    .ph-lcd-status.active { color: #1a4000; }
+    .ph-lcd-status.ended  { color: #6a1500; }
+    .ph-lcd-status.error  { color: #5a3000; }
+    .ph-lcd-body { white-space: pre-wrap; word-break: break-word; flex-grow: 1; font-size: 0.6rem; }
+
+    /* SIM row - HIDDEN */
+    .ph-simrow { display: none; }
+
+    /* digit display */
+    .ph-digit-input { width: 100%; background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.07); border-radius: 3px; color: rgba(255,255,255,0.9); font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; padding: 2px 5px; outline: none; text-align: center; letter-spacing: 0.06em; }
+    .ph-digit-input:focus { border-color: rgba(16,185,129,0.45); }
+
+    /* controls zone */
+    .ph-controls { display: flex; flex-direction: column; gap: 3px; }
+    .ph-soft-row { display: grid; grid-template-columns: 1fr 46px 1fr; gap: 3px; align-items: center; }
+    .ph-soft { background: linear-gradient(to bottom, #484848, #2E2E2E); border: none; border-radius: 5px; color: rgba(255,255,255,0.8); font-family: 'Outfit', sans-serif; font-size: 0.44rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 5px 2px; cursor: pointer; box-shadow: 0 2px 0 #111, inset 0 1px 0 rgba(255,255,255,0.06); text-align: center; transition: filter 0.1s; }
+    .ph-soft:hover  { filter: brightness(1.2); }
+    .ph-soft:active { transform: translateY(1px); box-shadow: 0 1px 0 #111; }
+
+    /* d-pad ring */
+    .ph-nav-ring { position: relative; width: 46px; height: 46px; background: radial-gradient(circle, #484848 30%, #2a2a2a 100%); border-radius: 50%; box-shadow: 0 2px 0 #111, inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .ph-nav-btn { position: absolute; background: transparent; border: none; color: rgba(255,255,255,0.55); font-size: 0.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .ph-nav-btn:hover  { color: rgba(255,255,255,0.9); }
+    .ph-nav-btn:active { transform: scale(0.85); }
+    .ph-nav-up    { top: 2px;    left: 50%;  transform: translateX(-50%); width: 20px; height: 14px; }
+    .ph-nav-down  { bottom: 2px; left: 50%;  transform: translateX(-50%); width: 20px; height: 14px; }
+    .ph-nav-left  { left: 2px;   top: 50%;   transform: translateY(-50%); width: 14px; height: 20px; }
+    .ph-nav-right { right: 2px;  top: 50%;   transform: translateY(-50%); width: 14px; height: 20px; }
+    .ph-nav-ok { position: absolute; width: 18px; height: 18px; background: radial-gradient(circle at 35% 30%, #5a5a5a, #2a2a2a); border: none; border-radius: 50%; color: rgba(255,255,255,0.85); font-size: 0.38rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; }
+    .ph-nav-ok:active { transform: scale(0.92); }
+
+    /* call / end row */
+    .ph-call-row { display: grid; grid-template-columns: 1fr 46px 1fr; gap: 3px; align-items: center; }
+    .ph-call-btn { background: linear-gradient(to bottom, #3ECF6A, #229147); border: none; border-radius: 5px; color: #FFF; font-size: 0.85rem; padding: 4px 0; cursor: pointer; box-shadow: 0 2px 0 #175c2e, inset 0 1px 0 rgba(255,255,255,0.25); text-align: center; transition: filter 0.1s; line-height: 1; }
+    .ph-call-btn:hover  { filter: brightness(1.1); }
+    .ph-call-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #175c2e; }
+    .ph-end-btn  { background: linear-gradient(to bottom, #F05252, #C0392B); border: none; border-radius: 5px; color: #FFF; font-size: 0.85rem; padding: 4px 0; cursor: pointer; box-shadow: 0 2px 0 #7b1e15, inset 0 1px 0 rgba(255,255,255,0.25); text-align: center; transition: filter 0.1s; line-height: 1; }
+    .ph-end-btn:hover  { filter: brightness(1.1); }
+    .ph-end-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 #7b1e15; }
+    .ph-mid-btn  { width: 46px; min-height: 22px; background: linear-gradient(to bottom, #444, #2a2a2a); border: none; border-radius: 4px; color: rgba(255,255,255,0.4); font-size: 0.65rem; cursor: pointer; box-shadow: 0 1px 0 #111, inset 0 1px 0 rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; }
+
+    /* keypad */
+    .ph-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+    .ph-key { background: linear-gradient(to bottom, #4A4A4A, #303030); border: none; border-radius: 4px; color: rgba(255,255,255,0.92); cursor: pointer; padding: 4px 2px 2px; box-shadow: 0 2px 0 #151515, inset 0 1px 0 rgba(255,255,255,0.07); transition: filter 0.08s; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; }
+    .ph-key:hover  { filter: brightness(1.18); }
+    .ph-key:active { transform: translateY(1px); box-shadow: 0 1px 0 #151515; }
+    .ph-key-num { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; font-weight: 700; color: rgba(255,255,255,0.95); line-height: 1; }
+    .ph-key-abc { font-family: 'Outfit', sans-serif; font-size: 0.36rem; color: rgba(255,255,255,0.38); letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.2; }
+    .ph-key.sym .ph-key-num { font-size: 1rem; color: rgba(255,255,255,0.7); }
+
+    /* mic */
+    .ph-mic { display: flex; justify-content: center; gap: 3px; margin-top: 1px; }
+    .ph-mic-dot { width: 2px; height: 2px; background: rgba(255,255,255,0.12); border-radius: 50%; }
+
+    /* hint */
+    .hint-bar { flex-shrink: 0; text-align: center; padding-top: 0.1rem; }
+    .hint { font-size: 0.67rem; color: #64748B; font-family: 'Afacad', sans-serif; }
 
     @keyframes smsIn {
-      from { opacity: 0; transform: translateY(6px); }
-      to { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; transform: translateX(-5px); }
+      to   { opacity: 1; transform: translateX(0); }
     }
   </style>
 </head>
+
+<!-- socket.io client — served directly from the NestJS backend -->
+<script src="http://localhost:3000/socket.io/socket.io.js"></script>
+
 <body>
-  <div class="lab">
-    <header class="masthead">
-      <p class="eyebrow">Escrow Vault · Phase 3</p>
+<div class="lab">
+
+  <!-- HEADER -->
+  <header class="masthead">
+    <div class="title-area">
       <h1>USSD Handset Lab</h1>
-      <p class="lede">
-        Three feature phones on one bench. Dial the shortcode, tap the keypad,
-        watch SMS land — same flow a farmer gets on a basic handset.
-      </p>
-      <div class="shortcode-chip">
-        <span>Shortcode</span>
-        *384*96#
-      </div>
-    </header>
-
-    <div class="bench" id="phonesGrid"></div>
-
-    <div class="dock">
-      <button type="button" class="add-btn" onclick="addPhone()">Add another handset</button>
+      <span class="eyebrow">Escrow Vault · Phase 3</span>
     </div>
-    <p class="hint">Tip: use the on-screen keypad, then Send. Dial starts a new USSD session.</p>
+    <div class="header-actions">
+      <div class="ws-pill">
+        <div class="ws-dot" id="ws-indicator"></div>
+        <span class="ws-lbl" id="ws-label">WS…</span>
+      </div>
+      <div class="shortcode-badge">
+        <span class="shortcode-label">Shortcode</span>
+        <span class="shortcode-value">*384*96#</span>
+      </div>
+      <button class="add-btn" onclick="addPhone()">+ Add handset</button>
+    </div>
+  </header>
+
+  <!-- PHONES GRID -->
+  <div class="bench" id="phonesGrid"></div>
+
+  <!-- HINT -->
+  <div class="hint-bar">
+    <p class="hint">Use keypad to type digits · ☎ Dial starts a USSD session · ✕ End hangs up · SMS arrive instantly via WebSocket</p>
   </div>
+</div>
 
-  <script>
-    const USSD_API_URL = 'http://localhost:4000';
-    const BACKEND_API_URL = 'http://localhost:3000';
-    const SHORTCODE = '*384*96#';
-    let phoneCount = 0;
-    const phones = {};
-    const smsPollers = {};
-    const roles = ['Sender', 'Driver', 'Receiver'];
+<script>
+  /* ─── Constants ────────────────────────────────── */
+  const USSD_API    = 'http://localhost:4000';
+  const BACKEND_API = 'http://localhost:3000';
+  const WS_URL      = 'http://localhost:3000';   // socket.io namespace
+  const SHORTCODE   = '*384*96#';
 
-    window.onload = () => {
-      addPhone('0788100001'); // Musanze Cooperative → +250788100001
-      addPhone('0788300003'); // Driver James → +250788300003
-      addPhone('0788200002'); // Kigali Fresh Market → +250788200002
+  let phoneCount   = 0;
+  const phones     = {};
+  const roles      = ['Sender', 'Driver', 'Receiver'];
+  let   globalSock = null;   // single socket.io connection shared by all phones
+
+  const KEY_ABC = {
+    '1':'', '2':'ABC', '3':'DEF',
+    '4':'GHI', '5':'JKL', '6':'MNO',
+    '7':'PQRS', '8':'TUV', '9':'WXYZ',
+    '*':'', '0':'+', '#':''
+  };
+
+  /* ─── Init ─────────────────────────────────────── */
+  window.onload = () => {
+    initSocket();
+    addPhone('0788100001');
+    addPhone('0788300003');
+    addPhone('0788200002');
+  };
+
+  /* ─── Utils ────────────────────────────────────── */
+  function sid() { return 'sim_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9); }
+
+  function canonical(n) {
+    const c = String(n || '').trim().replace(/[\s-]/g, '');
+    if (/^07\d{8}$/.test(c))      return '+250' + c.slice(1);
+    if (/^\+2507\d{8}$/.test(c))  return c;
+    if (/^2507\d{8}$/.test(c))    return '+' + c;
+    return c;
+  }
+
+  function fmtSim(n) {
+    const c = String(n || '').replace(/[\s-]/g, '');
+    if (/^07\d{8}$/.test(c)) return c.slice(0,4)+' '+c.slice(4,7)+' '+c.slice(7);
+    return n;
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  /* ─── WebSocket ────────────────────────────────── */
+  function initSocket() {
+    if (!window.io) {
+      setWs('err', 'WS N/A');
+      console.warn('socket.io not loaded – is backend running?');
+      return;
+    }
+
+    globalSock = io(`${WS_URL}/notifications`, {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 20,
+      reconnectionDelay: 2000,
+    });
+
+    globalSock.on('connect', () => {
+      setWs('ok', 'Live');
+      // Re-subscribe every phone's room after reconnect
+      Object.keys(phones).forEach(id => {
+        const phone = phones[id]?.canonicalPhone;
+        if (phone) globalSock.emit('subscribe', { phone });
+      });
+    });
+
+    globalSock.on('disconnect', ()    => setWs('',    'Reconnecting…'));
+    globalSock.on('connect_error', () => setWs('err', 'WS error'));
+
+    // Route incoming notifications to correct phone column
+    globalSock.on('notification', payload => {
+      const id = findById(payload.recipientPhone);
+      if (id) appendMsg(id, payload);
+    });
+  }
+
+  function setWs(cls, label) {
+    const d = document.getElementById('ws-indicator');
+    const l = document.getElementById('ws-label');
+    if (d) d.className = 'ws-dot ' + cls;
+    if (l) l.textContent = label;
+  }
+
+  function findById(phone) {
+    if (!phone) return null;
+    const norm = canonical(phone);
+    return Object.keys(phones).find(id => phones[id].canonicalPhone === norm) || null;
+  }
+
+  function subscribePhone(id) {
+    const phone = phones[id]?.canonicalPhone;
+    if (!phone || !globalSock?.connected) return;
+    globalSock.emit('subscribe', { phone });
+  }
+
+  /* ─── Keypad HTML ──────────────────────────────── */
+  function keypadHTML(id) {
+    return ['1','2','3','4','5','6','7','8','9','*','0','#'].map(k => `
+      <button class="ph-key ${k==='*'||k==='#'?'sym':''}" onclick="pressKey('${id}','${k}')">
+        <span class="ph-key-num">${k}</span>
+        ${KEY_ABC[k] ? `<span class="ph-key-abc">${KEY_ABC[k]}</span>` : ''}
+      </button>`).join('');
+  }
+
+  /* ─── Add Phone ────────────────────────────────── */
+  function addPhone(defaultNum = '') {
+    phoneCount++;
+    const id   = `ph${phoneCount}`;
+    const role = roles[phoneCount - 1] || `Line ${phoneCount}`;
+
+    const col = document.createElement('div');
+    col.className = 'phone-col';
+    col.id = id;
+
+    col.innerHTML = `
+      <div class="role-tag">
+        <span class="role-name">${role}</span>
+        <span class="role-badge" id="${id}-simtag">${defaultNum ? fmtSim(defaultNum) : 'No SIM'}</span>
+      </div>
+
+      <div class="sms-panel">
+        <div class="sms-header">
+          <div class="sms-title"><span>✉</span><span>SMS Inbox</span></div>
+          <span class="sms-count" id="${id}-cnt">0</span>
+        </div>
+        <div class="sms-list" id="${id}-sms"><div class="sms-empty">No messages yet</div></div>
+      </div>
+
+      <div class="phone">
+        <div class="ph-top-row">
+          <div class="ph-camera"></div>
+          <div class="ph-ear"></div>
+        </div>
+        <div class="ph-bezel">
+          <div class="ph-statusbar">
+            <span>▐▌▌▌</span>
+            <span id="${id}-clock">00:00</span>
+            <span>GSM 🔋</span>
+          </div>
+          <div class="ph-lcd" id="${id}-lcd">
+            <div class="ph-lcd-meta">
+              <span class="ph-lcd-status" id="${id}-status">IDLE</span>
+              <span id="${id}-time2">—</span>
+            </div>
+            <div class="ph-lcd-body" id="${id}-body">Dial ${SHORTCODE}</div>
+          </div>
+        </div>
+        <div class="ph-simrow">
+          <label>SIM</label>
+          <input id="${id}-num" type="text" value="${defaultNum}"
+                 placeholder="0788xxxxxx" inputmode="tel" autocomplete="off"
+                 oninput="onNumChange('${id}')">
+        </div>
+        <input class="ph-digit-input" id="${id}-inp"
+               placeholder="_ _ _ _ _" maxlength="24" inputmode="numeric" autocomplete="off">
+        <div class="ph-controls">
+          <div class="ph-soft-row">
+            <button class="ph-soft" onclick="softL('${id}')">Menu</button>
+            <div class="ph-nav-ring">
+              <button class="ph-nav-btn ph-nav-up"    onclick="nav('${id}','up')">▲</button>
+              <button class="ph-nav-btn ph-nav-left"  onclick="nav('${id}','left')">◀</button>
+              <button class="ph-nav-ok"               onclick="sendInput('${id}')">OK</button>
+              <button class="ph-nav-btn ph-nav-right" onclick="nav('${id}','right')">▶</button>
+              <button class="ph-nav-btn ph-nav-down"  onclick="nav('${id}','down')">▼</button>
+            </div>
+            <button class="ph-soft" onclick="softR('${id}')">Back</button>
+          </div>
+          <div class="ph-call-row">
+            <button class="ph-call-btn" onclick="dial('${id}')" title="Call">☎</button>
+            <div class="ph-mid-btn">📷</div>
+            <button class="ph-end-btn"  onclick="endSession('${id}')" title="End">✕</button>
+          </div>
+        </div>
+        <div class="ph-keypad">${keypadHTML(id)}</div>
+        <div class="ph-mic">${Array(7).fill('<div class="ph-mic-dot"></div>').join('')}</div>
+      </div>`;
+
+    document.getElementById('phonesGrid').appendChild(col);
+
+    phones[id] = {
+      sessionId: null, text: '', phoneNumber: defaultNum,
+      canonicalPhone: defaultNum ? canonical(defaultNum) : null,
+      idleTimer: null, _msgCount: 0
     };
 
-    function generateSessionId() {
-      return 'sim_' + Date.now() + '_' + Math.random().toString(36).slice(2, 11);
+    tickClock(id);
+    setInterval(() => tickClock(id), 30000);
+
+    if (defaultNum) {
+      subscribePhone(id);
+      fetchHistory(id);
     }
+  }
 
-    /** UI shows 0788…; APIs use +2507… under the hood */
-    function toCanonicalPhone(input) {
-      const cleaned = String(input || '').trim().replace(/[\s-]+/g, '');
-      if (/^07\d{8}$/.test(cleaned)) return '+250' + cleaned.slice(1);
-      if (/^\+2507\d{8}$/.test(cleaned)) return cleaned;
-      if (/^2507\d{8}$/.test(cleaned)) return '+' + cleaned;
-      return cleaned;
+  function tickClock(id) {
+    const d = new Date();
+    const t = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+    const c = document.getElementById(`${id}-clock`);
+    const t2 = document.getElementById(`${id}-time2`);
+    if (c)  c.textContent  = t;
+    if (t2) t2.textContent = t;
+  }
+
+  /* ─── SIM number changed ───────────────────────── */
+  function onNumChange(id) {
+    const val = document.getElementById(`${id}-num`).value.trim();
+    const tag = document.getElementById(`${id}-simtag`);
+    if (tag) tag.textContent = val ? fmtSim(val) : 'No SIM';
+    phones[id].phoneNumber    = val;
+    phones[id].canonicalPhone = val ? canonical(val) : null;
+    phones[id]._msgCount = 0;
+
+    const cnt = document.getElementById(`${id}-cnt`);
+    if (cnt) { cnt.textContent = '0'; cnt.classList.remove('active'); }
+    const list = document.getElementById(`${id}-sms`);
+    if (list) list.innerHTML = '<div class="sms-empty">No messages yet</div>';
+
+    if (val) { subscribePhone(id); fetchHistory(id); }
+  }
+
+  /* ─── Keypad ───────────────────────────────────── */
+  function pressKey(id, digit) {
+    const inp = document.getElementById(`${id}-inp`);
+    if (inp && inp.value.length < 24) inp.value += digit;
+  }
+
+  function nav(id, dir) {
+    const inp = document.getElementById(`${id}-inp`);
+    const lcd = document.getElementById(`${id}-lcd`);
+    if (dir === 'left'  && inp) inp.value = inp.value.slice(0,-1);
+    if (dir === 'up'    && lcd) lcd.scrollTop -= 15;
+    if (dir === 'down'  && lcd) lcd.scrollTop += 15;
+  }
+
+  function softL(id) { document.getElementById(`${id}-inp`).value = ''; dial(id); }
+  function softR(id) {
+    const inp = document.getElementById(`${id}-inp`);
+    if (inp) inp.value = inp.value.slice(0,-1);
+  }
+
+  /* ─── USSD Dial ────────────────────────────────── */
+  async function dial(id) {
+    const display = document.getElementById(`${id}-num`).value.trim();
+    if (!display) { setStatus(id, 'NO SIM', 'error'); return; }
+
+    const phone = canonical(display);
+    phones[id] = { ...phones[id], sessionId: sid(), text: '', phoneNumber: display, canonicalPhone: phone };
+    document.getElementById(`${id}-inp`).value = '';
+    setStatus(id, 'DIALING', 'active');
+
+    try {
+      const r = await fetch(`${USSD_API}/ussd`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: phones[id].sessionId, phoneNumber: phone, text: '' })
+      });
+      const msg = await r.text();
+      showMsg(id, msg);
+      if (msg.startsWith('END')) { phones[id].sessionId = null; onEnd(id, msg); }
+      else { clearTimer(id); setStatus(id, 'ACTIVE', 'active'); }
+      subscribePhone(id);
+      fetchHistory(id);
+    } catch {
+      setStatus(id, 'NET ERR', 'error');
+      showMsg(id, 'END Network error.\nIs USSD running on :4000?');
     }
+  }
 
-    function keypadHtml(phoneId) {
-      const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
-      return keys.map((digit) => `
-        <button type="button" class="key" onclick="pressKey('${phoneId}', '${digit}')">${digit}</button>
-      `).join('');
-    }
+  /* ─── Send USSD input ──────────────────────────── */
+  async function sendInput(id) {
+    const val = document.getElementById(`${id}-inp`).value.trim();
+    if (!phones[id].sessionId) { setStatus(id, 'DIAL 1ST', 'error'); return; }
+    if (!val) { setStatus(id, 'ENTER DIGITS', 'error'); return; }
 
-    function addPhone(defaultNumber = '') {
-      phoneCount++;
-      const phoneId = `phone${phoneCount}`;
-      const role = roles[phoneCount - 1] || `Line ${phoneCount}`;
+    phones[id].text = phones[id].text ? `${phones[id].text}*${val}` : val;
+    const phone = phones[id].canonicalPhone || canonical(phones[id].phoneNumber);
+    setStatus(id, 'SENDING', 'active');
 
-      const wrap = document.createElement('div');
-      wrap.className = 'handset-wrap';
-      wrap.id = phoneId;
+    try {
+      const r = await fetch(`${USSD_API}/ussd`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: phones[id].sessionId, phoneNumber: phone, text: phones[id].text })
+      });
+      const msg = await r.text();
+      showMsg(id, msg);
+      document.getElementById(`${id}-inp`).value = '';
+      if (msg.startsWith('END')) {
+        phones[id].sessionId = null; phones[id].text = '';
+        onEnd(id, msg);
+      } else { clearTimer(id); setStatus(id, 'ACTIVE', 'active'); }
+    } catch { setStatus(id, 'NET ERR', 'error'); showMsg(id, 'END Network error. Try again.'); }
+  }
 
-      wrap.innerHTML = `
-        <div class="role-tag">
-          <span>${role}</span>
-          <em>Handset ${phoneCount}</em>
-        </div>
-        <div class="handset">
-          <div class="speaker" aria-hidden="true"></div>
-          <div class="msisdn">
-            <label for="${phoneId}-number">SIM number</label>
-            <input type="text" id="${phoneId}-number" value="${defaultNumber}"
-                   placeholder="0788123456" inputmode="tel" autocomplete="off">
-          </div>
-          <div class="lcd-shell">
-            <div class="lcd empty" id="${phoneId}-screen">
-              <div class="lcd-status" id="${phoneId}-status">Idle · ready to dial</div>
-              <div id="${phoneId}-lcd-body">Dial ${SHORTCODE}</div>
-            </div>
-          </div>
-          <div class="soft-row">
-            <button type="button" class="soft soft-dial" onclick="dial('${phoneId}')">Dial</button>
-            <button type="button" class="soft soft-send" onclick="sendInput('${phoneId}')">Send</button>
-            <button type="button" class="soft soft-end" onclick="endSession('${phoneId}')">End</button>
-          </div>
-          <input type="text" class="digit-field" id="${phoneId}-input"
-                 placeholder="Digits…" maxlength="24" inputmode="numeric" autocomplete="off">
-          <div class="keypad">${keypadHtml(phoneId)}</div>
-          <div class="mic" aria-hidden="true"></div>
-        </div>
-        <div class="sms-panel" id="${phoneId}-sms">
-          <header>
-            <span>SMS inbox</span>
-            <span class="sms-count" id="${phoneId}-sms-count">0</span>
-          </header>
-          <div class="sms-list" id="${phoneId}-sms-messages">
-            <div class="sms-empty">No messages yet</div>
-          </div>
-        </div>
-      `;
+  /* ─── Session end ──────────────────────────────── */
+  function endSession(id) {
+    clearTimer(id);
+    phones[id].sessionId = null; phones[id].text = '';
+    document.getElementById(`${id}-inp`).value = '';
+    setStatus(id, 'IDLE', '');
+    const body = document.getElementById(`${id}-body`);
+    if (body) body.textContent = `Dial ${SHORTCODE}`;
+    const lcd = document.getElementById(`${id}-lcd`);
+    if (lcd) lcd.classList.add('empty');
+  }
 
-      document.getElementById('phonesGrid').appendChild(wrap);
+  function onEnd(id, msg) {
+    clearTimer(id);
+    if (/SMS when complete|Processing/i.test(msg.replace(/^END\s/, ''))) {
+      setStatus(id, 'PROCESSING', 'ended');
+      phones[id].idleTimer = setTimeout(() => endSession(id), 5000);
+    } else { setStatus(id, 'ENDED', 'ended'); }
+  }
 
-      phones[phoneId] = {
-        sessionId: null,
-        text: '',
-        phoneNumber: defaultNumber,
-        canonicalPhone: defaultNumber ? toCanonicalPhone(defaultNumber) : null,
-        idleTimer: null,
-      };
+  function clearTimer(id) {
+    if (phones[id]?.idleTimer) { clearTimeout(phones[id].idleTimer); phones[id].idleTimer = null; }
+  }
 
-      if (defaultNumber) startSmsPolling(phoneId);
-    }
+  function showMsg(id, msg) {
+    const lcd  = document.getElementById(`${id}-lcd`);
+    const body = document.getElementById(`${id}-body`);
+    if (body) body.textContent = msg.replace(/^(CON|END)\s/, '');
+    if (lcd)  lcd.classList.remove('empty');
+  }
 
-    function pressKey(phoneId, digit) {
-      const input = document.getElementById(`${phoneId}-input`);
-      if (!input) return;
-      if (input.value.length >= 24) return;
-      input.value += digit;
-      input.focus();
-    }
+  function setStatus(id, txt, cls) {
+    const el = document.getElementById(`${id}-status`);
+    if (el) { el.textContent = txt; el.className = 'ph-lcd-status ' + (cls || ''); }
+  }
 
-    async function dial(phoneId) {
-      const displayPhone = document.getElementById(`${phoneId}-number`).value.trim();
-      if (!displayPhone) {
-        updateStatus(phoneId, 'Enter a SIM number', 'error');
-        return;
-      }
+  /* ─── SMS display ──────────────────────────────── */
 
-      const phoneNumber = toCanonicalPhone(displayPhone);
-      phones[phoneId].sessionId = generateSessionId();
-      phones[phoneId].text = '';
-      phones[phoneId].phoneNumber = displayPhone;
-      phones[phoneId].canonicalPhone = phoneNumber;
-      document.getElementById(`${phoneId}-input`).value = '';
+  /** Load historical messages from DB on first connect */
+  async function fetchHistory(id) {
+    const display = phones[id]?.phoneNumber;
+    if (!display) return;
+    const phone = phones[id].canonicalPhone || canonical(display);
+    try {
+      const r = await fetch(`${BACKEND_API}/users/${encodeURIComponent(phone)}/notifications`);
+      const d = await r.json();
+      if (d.success && d.data) renderSms(id, d.data);
+    } catch { /* backend offline */ }
+  }
 
-      updateStatus(phoneId, 'Dialing shortcode…', 'active');
+  /** Push a single real-time notification into the inbox (no full re-render) */
+  function appendMsg(id, payload) {
+    const listEl = document.getElementById(`${id}-sms`);
+    const cntEl  = document.getElementById(`${id}-cnt`);
+    if (!listEl) return;
 
-      try {
-        const response = await fetch(`${USSD_API_URL}/ussd`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: phones[phoneId].sessionId,
-            phoneNumber,
-            text: '',
-          }),
-        });
+    const empty = listEl.querySelector('.sms-empty');
+    if (empty) empty.remove();
 
-        const message = await response.text();
-        displayMessage(phoneId, message);
+    const div = document.createElement('div');
+    div.className = 'sms-item';
+    div.innerHTML = `${esc(payload.message)}<time>${new Date(payload.sentAt).toLocaleTimeString()}</time>`;
+    listEl.prepend(div);
 
-        if (message.startsWith('END')) {
-          phones[phoneId].sessionId = null;
-          handleEndResponse(phoneId, message);
-        } else {
-          clearIdleReturn(phoneId);
-          updateStatus(phoneId, 'Session active', 'active');
-        }
+    phones[id]._msgCount = (phones[id]._msgCount || 0) + 1;
+    if (cntEl) { cntEl.textContent = String(phones[id]._msgCount); cntEl.classList.add('active'); }
+  }
 
-        startSmsPolling(phoneId);
-      } catch (error) {
-        console.error('Dial error:', error);
-        updateStatus(phoneId, 'Network error', 'error');
-        displayMessage(phoneId, 'END Network error. Is the USSD service on :4000?');
-      }
-    }
+  /** Full re-render of inbox (used for history load) */
+  function renderSms(id, list) {
+    const el  = document.getElementById(`${id}-sms`);
+    const cnt = document.getElementById(`${id}-cnt`);
+    phones[id]._msgCount = list.length;
+    if (cnt) { cnt.textContent = String(list.length); list.length ? cnt.classList.add('active') : cnt.classList.remove('active'); }
+    if (!el) return;
+    if (!list.length) { el.innerHTML = '<div class="sms-empty">No messages yet</div>'; return; }
+    el.innerHTML = list.slice(0, 6).map(n => `
+      <div class="sms-item">${esc(n.message)}<time>${new Date(n.sentAt).toLocaleTimeString()}</time></div>
+    `).join('');
+  }
 
-    async function sendInput(phoneId) {
-      const input = document.getElementById(`${phoneId}-input`).value.trim();
-
-      if (!phones[phoneId].sessionId) {
-        updateStatus(phoneId, 'Dial first', 'error');
-        return;
-      }
-      if (!input) {
-        updateStatus(phoneId, 'Enter digits', 'error');
-        return;
-      }
-
-      phones[phoneId].text = phones[phoneId].text
-        ? `${phones[phoneId].text}*${input}`
-        : input;
-
-      const displayPhone =
-        phones[phoneId].phoneNumber ||
-        document.getElementById(`${phoneId}-number`).value.trim();
-      const phoneNumber =
-        phones[phoneId].canonicalPhone || toCanonicalPhone(displayPhone);
-
-      updateStatus(phoneId, 'Sending…', 'active');
-
-      try {
-        const response = await fetch(`${USSD_API_URL}/ussd`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: phones[phoneId].sessionId,
-            phoneNumber,
-            text: phones[phoneId].text,
-          }),
-        });
-
-        const message = await response.text();
-        displayMessage(phoneId, message);
-        document.getElementById(`${phoneId}-input`).value = '';
-
-        if (message.startsWith('END')) {
-          phones[phoneId].sessionId = null;
-          phones[phoneId].text = '';
-          handleEndResponse(phoneId, message);
-        } else {
-          clearIdleReturn(phoneId);
-          updateStatus(phoneId, 'Session active', 'active');
-        }
-      } catch (error) {
-        console.error('Send error:', error);
-        updateStatus(phoneId, 'Network error', 'error');
-        displayMessage(phoneId, 'END Network error. Please try again.');
-      }
-    }
-
-    function isProcessingEndMessage(message) {
-      const body = message.replace(/^END\s/, '');
-      return /SMS when complete/i.test(body) || /Processing/i.test(body);
-    }
-
-    function clearIdleReturn(phoneId) {
-      const phone = phones[phoneId];
-      if (phone?.idleTimer) {
-        clearTimeout(phone.idleTimer);
-        phone.idleTimer = null;
-      }
-    }
-
-    function handleEndResponse(phoneId, message) {
-      clearIdleReturn(phoneId);
-
-      if (isProcessingEndMessage(message)) {
-        updateStatus(phoneId, 'Processing… returning to idle', 'ended');
-        phones[phoneId].idleTimer = setTimeout(() => {
-          endSession(phoneId);
-        }, 5000);
-        return;
-      }
-
-      updateStatus(phoneId, 'Session ended', 'ended');
-    }
-
-    function endSession(phoneId) {
-      clearIdleReturn(phoneId);
-      phones[phoneId].sessionId = null;
-      phones[phoneId].text = '';
-      document.getElementById(`${phoneId}-input`).value = '';
-      updateStatus(phoneId, 'Idle · ready to dial', '');
-      const screen = document.getElementById(`${phoneId}-screen`);
-      const body = document.getElementById(`${phoneId}-lcd-body`);
-      body.textContent = `Dial ${SHORTCODE}`;
-      screen.classList.add('empty');
-    }
-
-    function displayMessage(phoneId, message) {
-      const screen = document.getElementById(`${phoneId}-screen`);
-      const body = document.getElementById(`${phoneId}-lcd-body`);
-      const display = message.replace(/^(CON|END)\s/, '');
-      body.textContent = display;
-      screen.classList.remove('empty');
-      screen.classList.remove('flash');
-      void screen.offsetWidth;
-      screen.classList.add('flash');
-    }
-
-    function updateStatus(phoneId, text, statusClass) {
-      const status = document.getElementById(`${phoneId}-status`);
-      status.textContent = text;
-      status.className = 'lcd-status ' + (statusClass || '');
-    }
-
-    function startSmsPolling(phoneId) {
-      if (smsPollers[phoneId]) return;
-      smsPollers[phoneId] = setInterval(() => fetchSms(phoneId), 5000);
-      fetchSms(phoneId);
-    }
-
-    async function fetchSms(phoneId) {
-      const displayPhone = phones[phoneId]?.phoneNumber
-        || document.getElementById(`${phoneId}-number`)?.value.trim();
-      if (!displayPhone) return;
-      phones[phoneId].phoneNumber = displayPhone;
-      const phoneNumber =
-        phones[phoneId].canonicalPhone || toCanonicalPhone(displayPhone);
-
-      try {
-        const response = await fetch(
-          `${BACKEND_API_URL}/users/${encodeURIComponent(phoneNumber)}/notifications`
-        );
-        const data = await response.json();
-        if (data.success && data.data) displaySms(phoneId, data.data);
-      } catch (_) {
-        /* backend may be offline */
-      }
-    }
-
-    function displaySms(phoneId, notifications) {
-      const container = document.getElementById(`${phoneId}-sms-messages`);
-      const countEl = document.getElementById(`${phoneId}-sms-count`);
-      const list = notifications || [];
-      countEl.textContent = String(list.length);
-
-      if (list.length === 0) {
-        container.innerHTML = '<div class="sms-empty">No messages yet</div>';
-        return;
-      }
-
-      container.innerHTML = list.slice(0, 8).map((notif) => `
-        <div class="sms-item">
-          ${escapeHtml(notif.message)}
-          <time>${new Date(notif.sentAt).toLocaleTimeString()}</time>
-        </div>
-      `).join('');
-    }
-
-    function escapeHtml(str) {
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-    }
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key !== 'Enter') return;
-      const el = document.activeElement;
-      if (el && el.classList.contains('digit-field')) {
-        const phoneId = el.id.replace('-input', '');
-        sendInput(phoneId);
-      }
-    });
-  </script>
+  /* Enter shortcut */
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const el = document.activeElement;
+    if (el?.classList.contains('ph-digit-input')) sendInput(el.id.replace('-inp', ''));
+  });
+</script>
 </body>
 </html>

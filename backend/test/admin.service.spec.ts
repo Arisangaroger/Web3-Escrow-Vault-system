@@ -20,6 +20,7 @@ describe('AdminService', () => {
       findMany: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
     },
     dealActionLog: {
       create: jest.fn(),
@@ -272,6 +273,7 @@ describe('AdminService', () => {
       mockPrismaService.admin.findUnique.mockResolvedValue(mockAdmin);
       mockPrismaService.deal.findUnique.mockResolvedValue(mockDeal);
       mockContractsService.resolveDisputeOnChain.mockResolvedValue('0xtxhash');
+      mockPrismaService.deal.updateMany.mockResolvedValue({ count: 1 });
       mockPrismaService.deal.update.mockResolvedValue({
         ...mockDeal,
         status: 'Resolved',
@@ -290,9 +292,9 @@ describe('AdminService', () => {
         '0',
         '500000',
       );
-      expect(mockPrismaService.deal.update).toHaveBeenCalledWith({
-        where: { dealId: 1 },
-        data: { status: 'Resolved' },
+      expect(mockPrismaService.deal.updateMany).toHaveBeenCalledWith({
+        where: { dealId: 1, status: 'Disputed' },
+        data: { status: 'ResolutionPending' },
       });
       expect(mockPrismaService.dealActionLog.create).toHaveBeenCalledWith({
         data: expect.objectContaining({

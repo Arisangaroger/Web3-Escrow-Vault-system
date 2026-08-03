@@ -28,7 +28,7 @@ describe('Login Component', () => {
     
     expect(screen.getByText('Admin Portal')).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /login/i })).toBeInTheDocument();
   });
 
@@ -56,7 +56,7 @@ describe('Login Component', () => {
     renderWithRouter(<Login />);
     
     const emailInput = screen.getByLabelText(/email/i);
-    const passwordInput = screen.getByLabelText(/password/i);
+    const passwordInput = screen.getByLabelText(/^password$/i);
     
     fireEvent.change(emailInput, { target: { value: 'admin@test.com' } });
     fireEvent.change(passwordInput, { target: { value: 'password123' } });
