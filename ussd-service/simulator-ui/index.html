@@ -96,7 +96,7 @@
     .phone-col { display: flex; flex-direction: column; align-items: center; gap: 0.38rem; }
 
     .role-tag { width: 100%; display: flex; justify-content: center; align-items: center; }
-    .role-name { display: none; }
+    .role-name { font-size: 0.85rem; font-weight: 700; color: #1E293B; }
     .role-badge {
       font-size: 0.78rem; color: #059669; background: rgba(16,185,129,0.1);
       border-radius: 99px; padding: 0.08rem 0.6rem; font-weight: 600; font-family: 'Afacad', sans-serif;
@@ -282,7 +282,7 @@
 
   let phoneCount   = 0;
   const phones     = {};
-  const roles      = ['Sender', 'Driver', 'Receiver'];
+  const roles      = ['Sender (Farmer)', 'Driver', 'Receiver (Buyer)'];
   let   globalSock = null;   // single socket.io connection shared by all phones
 
   const KEY_ABC = {
@@ -393,17 +393,20 @@
     col.id = id;
 
     col.innerHTML = `
-      <div class="role-tag">
-        <span class="role-name">${role}</span>
-        <span class="role-badge" id="${id}-simtag">${defaultNum ? fmtSim(defaultNum) : 'No SIM'}</span>
-      </div>
-
       <div class="sms-panel">
         <div class="sms-header">
           <div class="sms-title"><span>✉</span><span>SMS Inbox</span></div>
           <span class="sms-count" id="${id}-cnt">0</span>
         </div>
         <div class="sms-list" id="${id}-sms"><div class="sms-empty">No messages yet</div></div>
+      </div>
+
+      <div class="role-tag">
+        <span class="role-badge" id="${id}-simtag">${defaultNum ? fmtSim(defaultNum) : 'No SIM'}</span>
+      </div>
+
+      <div class="role-tag">
+        <span class="role-name">${role}</span>
       </div>
 
       <div class="phone">

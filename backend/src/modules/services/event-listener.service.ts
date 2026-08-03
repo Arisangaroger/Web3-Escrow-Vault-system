@@ -48,6 +48,7 @@ export class EventListenerService implements OnModuleInit {
 
   @Cron('*/30 * * * * *')
   async syncEvents(): Promise<void> {
+    if (process.env.DISABLE_EVENT_LISTENER === '1') return;
     try {
       let syncState = await this.prisma.syncState.findFirst();
       if (!syncState) {

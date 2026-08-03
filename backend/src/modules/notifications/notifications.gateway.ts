@@ -74,7 +74,7 @@ export class NotificationsGateway
     const room = this.normalizePhone(phoneNumber);
     if (!room) return;
 
-    this.server.to(room).emit('notification', payload);
+    this.server?.to(room).emit('notification', payload);
     this.logger.log(`📡 WS push → room ${room}: ${payload.message.slice(0, 60)}…`);
   }
 

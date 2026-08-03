@@ -196,154 +196,15 @@ async function main() {
       }
     }
 
-    // 3. On-chain deals + DB rows in five lifecycle states
-    console.log('\nCreating on-chain deals...\n');
-
-    // --- Deal A: Created (awaiting fund lock) ---
-    const a = await deals.createDeal(
-      DEMO_USERS[0].phone,
-      DEMO_USERS[2].phone,
-      DEMO_USERS[1].phone,
-      '300000',
-      DEMO_USERS[0].pin,
-    );
-    await logAction(prisma, a.dealId, DEMO_USERS[0].phone, 'DealCreated', a.txHash);
-    console.log(`  ✅ Deal #${a.dealId}: Created (awaiting fund lock)`);
-
-    // --- Deal B: FundsLocked ---
-    const b = await deals.createDeal(
-      DEMO_USERS[3].phone,
-      DEMO_USERS[2].phone,
-      DEMO_USERS[4].phone,
-      '500000',
-      DEMO_USERS[3].pin,
-    );
-    const bLock = await deals.lockFunds(
-      DEMO_USERS[4].phone,
-      b.dealId,
-      DEMO_USERS[4].pin,
-    );
-    await setStatus(prisma, b.dealId, DealStatus.FundsLocked);
-    await logAction(prisma, b.dealId, DEMO_USERS[4].phone, 'FundsLocked', bLock);
-    console.log(`  ✅ Deal #${b.dealId}: FundsLocked (ready to ship)`);
-
-    // --- Deal C: Shipped ---
-    const c = await deals.createDeal(
-      DEMO_USERS[0].phone,
-      DEMO_USERS[2].phone,
-      DEMO_USERS[4].phone,
-      '450000',
-      DEMO_USERS[0].pin,
-    );
-    const cLock = await deals.lockFunds(
-      DEMO_USERS[4].phone,
-      c.dealId,
-      DEMO_USERS[4].pin,
-    );
-    await setStatus(prisma, c.dealId, DealStatus.FundsLocked);
-    await logAction(prisma, c.dealId, DEMO_USERS[4].phone, 'FundsLocked', cLock);
-    const cShip = await deals.markShipped(
-      DEMO_USERS[0].phone,
-      c.dealId,
-      DEMO_USERS[0].pin,
-    );
-    await setStatus(prisma, c.dealId, DealStatus.Shipped);
-    await logAction(prisma, c.dealId, DEMO_USERS[0].phone, 'MarkedShipped', cShip);
-    console.log(`  ✅ Deal #${c.dealId}: Shipped (in transit)`);
-
-    // --- Deal D: Delivered (~3h dispute window on Amoy) ---
-    const d = await deals.createDeal(
-      DEMO_USERS[3].phone,
-      DEMO_USERS[2].phone,
-      DEMO_USERS[1].phone,
-      '600000',
-      DEMO_USERS[3].pin,
-    );
-    const dLock = await deals.lockFunds(
-      DEMO_USERS[1].phone,
-      d.dealId,
-      DEMO_USERS[1].pin,
-    );
-    await setStatus(prisma, d.dealId, DealStatus.FundsLocked);
-    await logAction(prisma, d.dealId, DEMO_USERS[1].phone, 'FundsLocked', dLock);
-    const dShip = await deals.markShipped(
-      DEMO_USERS[3].phone,
-      d.dealId,
-      DEMO_USERS[3].pin,
-    );
-    await setStatus(prisma, d.dealId, DealStatus.Shipped);
-    await logAction(prisma, d.dealId, DEMO_USERS[3].phone, 'MarkedShipped', dShip);
-    const dDel = await deals.markDelivered(
-      DEMO_USERS[2].phone,
-      d.dealId,
-      DEMO_USERS[2].pin,
-    );
-
-    const onChain = await contracts.getDealFromChain(d.dealId);
-    const payoutReadyTime = new Date(Number(onChain.payoutReadyTime) * 1000);
-    await setStatus(prisma, d.dealId, DealStatus.Delivered, { payoutReadyTime });
-    await logAction(prisma, d.dealId, DEMO_USERS[2].phone, 'MarkedDelivered', dDel);
-    console.log(
-      `  ✅ Deal #${d.dealId}: Delivered (~3h dispute window; payoutReadyTime=${payoutReadyTime.toISOString()})`,
-    );
-
-    // --- Deal E: Disputed (admin portal) ---
-    const e = await deals.createDeal(
-      DEMO_USERS[0].phone,
-      DEMO_USERS[2].phone,
-      DEMO_USERS[1].phone,
-      '400000',
-      DEMO_USERS[0].pin,
-    );
-    const eLock = await deals.lockFunds(
-      DEMO_USERS[1].phone,
-      e.dealId,
-      DEMO_USERS[1].pin,
-    );
-    await setStatus(prisma, e.dealId, DealStatus.FundsLocked);
-    await logAction(prisma, e.dealId, DEMO_USERS[1].phone, 'FundsLocked', eLock);
-    const eShip = await deals.markShipped(
-      DEMO_USERS[0].phone,
-      e.dealId,
-      DEMO_USERS[0].pin,
-    );
-    await setStatus(prisma, e.dealId, DealStatus.Shipped);
-    await logAction(prisma, e.dealId, DEMO_USERS[0].phone, 'MarkedShipped', eShip);
-    const eDel = await deals.markDelivered(
-      DEMO_USERS[2].phone,
-      e.dealId,
-      DEMO_USERS[2].pin,
-    );
-    await setStatus(prisma, e.dealId, DealStatus.Delivered);
-    await logAction(prisma, e.dealId, DEMO_USERS[2].phone, 'MarkedDelivered', eDel);
-    // Brief pause so "early deliver" timeline still makes sense in portal
-    await sleep(500);
-    const eRevoke = await deals.revoke(
-      DEMO_USERS[1].phone,
-      e.dealId,
-      1,
-      DEMO_USERS[1].pin,
-    );
-    await setStatus(prisma, e.dealId, DealStatus.Disputed, {
-      disputeReasonCode: 1,
-    });
-    await logAction(prisma, e.dealId, DEMO_USERS[1].phone, 'Revoked', eRevoke);
-    console.log(`  ✅ Deal #${e.dealId}: Disputed (ready for admin resolution)`);
-
-    console.log('\n✅ Demo seed complete (chain + DB).\n');
-    console.log('📋 Credentials');
+    console.log('\n✅ Demo seed complete (users + tokens).\n');
+    console.log('📋 Demo User Credentials');
     console.log('─'.repeat(64));
     DEMO_USERS.forEach((u) => {
       console.log(`${u.name.padEnd(25)} ${u.phone.padEnd(16)} PIN ${u.pin}  [${u.role}]`);
     });
     console.log('─'.repeat(64));
-    console.log('\nDeals:');
-    console.log(`  #${a.dealId} Created`);
-    console.log(`  #${b.dealId} FundsLocked`);
-    console.log(`  #${c.dealId} Shipped`);
-    console.log(`  #${d.dealId} Delivered`);
-    console.log(`  #${e.dealId} Disputed`);
-    console.log('\nSee DEMO_CREDENTIALS.md for the walkthrough.');
+    console.log('\n📱 Use the USSD simulator to create deals manually.');
+    console.log('   Start with farmer phones to create deals, then use buyer phones to lock funds.');
   } finally {
     await app.close();
   }
