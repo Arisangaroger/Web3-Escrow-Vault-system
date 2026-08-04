@@ -17,6 +17,11 @@ model User {
   pinAttempts         Int      @default(0) @map("pin_attempts")
   lockoutUntil        DateTime? @map("lockout_until")
   createdAt           DateTime @default(now()) @map("created_at")
+  
+  // Optional user profile information for admin investigation
+  fullName            String?  @map("full_name")
+  nationalId          String?  @map("national_id")
+  location            String?  @map("location")
 
   dealsAsSender   Deal[] @relation("SenderDeals")
   dealsAsDriver   Deal[] @relation("DriverDeals")

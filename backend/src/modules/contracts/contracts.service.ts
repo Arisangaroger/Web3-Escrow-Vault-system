@@ -77,12 +77,18 @@ export class ContractsService {
       const relayWallet = this.gasRelayService.getTreasuryWallet();
       const amountWei = ethers.parseEther(amount);
 
+      // Gas configuration for Amoy (minimum 25 gwei)
+      const gasConfig = this.chainId === 80002 
+        ? { gasPrice: ethers.parseUnits('30', 'gwei') } 
+        : {};
+
       const tx = await this.escrowContract.connect(relayWallet).createDeal(
         senderAddress,
         driverAddress,
         receiverAddress,
         amountWei,
         signature,
+        gasConfig,
       );
 
       const receipt = await tx.wait();
@@ -121,7 +127,12 @@ export class ContractsService {
         Number(nonce),
       );
 
-      const tx = await this.escrowContract.connect(relayWallet).lockFunds(dealId, signature);
+      // Gas configuration for Amoy (minimum 25 gwei)
+      const gasConfig = this.chainId === 80002 
+        ? { gasPrice: ethers.parseUnits('30', 'gwei') } 
+        : {};
+
+      const tx = await this.escrowContract.connect(relayWallet).lockFunds(dealId, signature, gasConfig);
       const receipt = await tx.wait();
 
       this.logger.logTransaction('lockFunds', receipt.hash, {
@@ -152,7 +163,13 @@ export class ContractsService {
       );
 
       const relayWallet = this.gasRelayService.getTreasuryWallet();
-      const tx = await this.escrowContract.connect(relayWallet).markShipped(dealId, signature);
+
+      // Gas configuration for Amoy (minimum 25 gwei)
+      const gasConfig = this.chainId === 80002 
+        ? { gasPrice: ethers.parseUnits('30', 'gwei') } 
+        : {};
+
+      const tx = await this.escrowContract.connect(relayWallet).markShipped(dealId, signature, gasConfig);
       const receipt = await tx.wait();
 
       this.logger.logTransaction('markShipped', receipt.hash, {
@@ -185,6 +202,11 @@ export class ContractsService {
       const relayWallet = this.gasRelayService.getTreasuryWallet();
       const connected = this.escrowContract.connect(relayWallet);
 
+      // Gas configuration for Amoy (minimum 25 gwei)
+      const gasConfig = this.chainId === 80002 
+        ? { gasPrice: ethers.parseUnits('30', 'gwei') } 
+        : {};
+
       // Surface clear revert reasons instead of ethers "missing revert data"
       try {
         await connected.markDelivered.staticCall(dealId, signature);
@@ -192,7 +214,7 @@ export class ContractsService {
         throw new Error(this.formatContractError('markDelivered', simError));
       }
 
-      const tx = await connected.markDelivered(dealId, signature);
+      const tx = await connected.markDelivered(dealId, signature, gasConfig);
       const receipt = await tx.wait();
 
       this.logger.logTransaction('markDelivered', receipt.hash, {
@@ -227,9 +249,15 @@ export class ContractsService {
       );
 
       const relayWallet = this.gasRelayService.getTreasuryWallet();
+
+      // Gas configuration for Amoy (minimum 25 gwei)
+      const gasConfig = this.chainId === 80002 
+        ? { gasPrice: ethers.parseUnits('30', 'gwei') } 
+        : {};
+
       const tx = await this.escrowContract
         .connect(relayWallet)
-        .revoke(dealId, reasonCode, userAddress, signature);
+        .revoke(dealId, reasonCode, userAddress, signature, gasConfig);
       const receipt = await tx.wait();
 
       this.logger.logTransaction('revoke', receipt.hash, {
@@ -246,7 +274,13 @@ export class ContractsService {
   async releaseFundsOnChain(dealId: number): Promise<string> {
     try {
       const treasuryWallet = this.gasRelayService.getTreasuryWallet();
-      const tx = await this.escrowContract.connect(treasuryWallet).releaseFunds(dealId);
+
+      // Gas configuration for Amoy (minimum 25 gwei)
+      const gasConfig = this.chainId === 80002 
+        ? { gasPrice: ethers.parseUnits('30', 'gwei') } 
+        : {};
+
+      const tx = await this.escrowContract.connect(treasuryWallet).releaseFunds(dealId, gasConfig);
       const receipt = await tx.wait();
       this.logger.logTransaction('releaseFunds', receipt.hash, { dealId });
       return receipt.hash;
@@ -258,7 +292,13 @@ export class ContractsService {
   async autoCancelOnChain(dealId: number): Promise<string> {
     try {
       const treasuryWallet = this.gasRelayService.getTreasuryWallet();
-      const tx = await this.escrowContract.connect(treasuryWallet).autoCancelIfUnlocked(dealId);
+
+      // Gas configuration for Amoy (minimum 25 gwei)
+      const gasConfig = this.chainId === 80002 
+        ? { gasPrice: ethers.parseUnits('30', 'gwei') } 
+        : {};
+
+      const tx = await this.escrowContract.connect(treasuryWallet).autoCancelIfUnlocked(dealId, gasConfig);
       const receipt = await tx.wait();
       this.logger.logTransaction('autoCancel', receipt.hash, { dealId });
       return receipt.hash;
@@ -285,9 +325,15 @@ export class ContractsService {
       );
 
       const relayWallet = this.gasRelayService.getTreasuryWallet();
+
+      // Gas configuration for Amoy (minimum 25 gwei)
+      const gasConfig = this.chainId === 80002 
+        ? { gasPrice: ethers.parseUnits('30', 'gwei') } 
+        : {};
+
       const tx = await this.escrowContract
         .connect(relayWallet)
-        .cancelBeforeLock(dealId, userAddress, signature);
+        .cancelBeforeLock(dealId, userAddress, signature, gasConfig);
       const receipt = await tx.wait();
 
       this.logger.logTransaction('cancelBeforeLock', receipt.hash, {
@@ -315,6 +361,11 @@ export class ContractsService {
       const relayWallet = this.gasRelayService.getTreasuryWallet();
       const connected = this.escrowContract.connect(relayWallet);
 
+      // Gas configuration for Amoy (minimum 25 gwei)
+      const gasConfig = this.chainId === 80002 
+        ? { gasPrice: ethers.parseUnits('30', 'gwei') } 
+        : {};
+
       // Validate up-front so the admin gets an instant, clear error instead of
       // waiting minutes for a revert to surface as "missing revert data".
       try {
@@ -331,6 +382,7 @@ export class ContractsService {
         dealId,
         amountToSenderWei,
         amountToReceiverWei,
+        gasConfig,
       );
 
       // Do not block the admin HTTP response. Portal shows ResolutionPending
@@ -419,7 +471,13 @@ export class ContractsService {
     try {
       const treasuryWallet = this.gasRelayService.getTreasuryWallet();
       const amountWei = ethers.parseEther(amount);
-      const tx = await this.eRWFContract.connect(treasuryWallet).mint(toAddress, amountWei);
+
+      // Gas configuration for Amoy (minimum 25 gwei)
+      const gasConfig = this.chainId === 80002 
+        ? { gasPrice: ethers.parseUnits('30', 'gwei') } 
+        : {};
+
+      const tx = await this.eRWFContract.connect(treasuryWallet).mint(toAddress, amountWei, gasConfig);
       const receipt = await tx.wait();
       this.logger.logTransaction('mint', receipt.hash, { toAddress, amount });
       return receipt.hash;

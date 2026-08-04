@@ -105,13 +105,14 @@ const DisputeQueue = () => {
     setFilteredDisputes(filtered);
   };
 
-  const reasonOptions = Array.from(
-    new Set(
-      disputes
-        .map((d) => d.disputeReasonText)
-        .filter((reason) => Boolean(reason))
-    )
-  ).sort();
+  // All possible dispute reasons from USSD menu
+  const allReasonOptions = [
+    'Goods not received',
+    'Wrong items delivered',
+    'Damaged goods',
+    'Quantity mismatch',
+    'Other'
+  ];
 
   const formatAmount = (amount) => {
     return new Intl.NumberFormat('en-RW', {
@@ -161,7 +162,7 @@ const DisputeQueue = () => {
 
         {!loading && !error && disputes.length > 0 && (
           <div className="filters-section">
-            <div className="filter-group">
+            <div className="filter-group filter-group-search">
               <input
                 type="text"
                 placeholder="Search by Deal ID, phone, or reason..."
@@ -170,15 +171,15 @@ const DisputeQueue = () => {
                 className="search-input"
               />
             </div>
-            <div className="filter-group">
-              <label>Reason:</label>
+            <div className="filter-group filter-group-reason">
+              <label>Filter by Reason</label>
               <select
                 value={reasonFilter}
                 onChange={(e) => setReasonFilter(e.target.value)}
                 className="filter-select"
               >
                 <option value="all">All Reasons</option>
-                {reasonOptions.map((reason) => (
+                {allReasonOptions.map((reason) => (
                   <option key={reason} value={reason}>
                     {reason}
                   </option>

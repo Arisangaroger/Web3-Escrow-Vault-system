@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "full_name" TEXT;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "national_id" TEXT;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "location" TEXT;

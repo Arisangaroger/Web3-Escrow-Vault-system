@@ -290,6 +290,31 @@ export class AdminService {
       fundLockDeadline: deal.fundLockDeadline,
       payoutReadyTime: deal.payoutReadyTime,
       pendingTxHash: deal.status === 'ResolutionPending' ? pendingLog?.txHash : null,
+      // User details for admin investigation
+      sender: {
+        phone: deal.sender.phoneNumber,
+        walletAddress: deal.sender.walletAddress,
+        fullName: deal.sender.fullName || null,
+        nationalId: deal.sender.nationalId || null,
+        location: deal.sender.location || null,
+        registeredAt: deal.sender.createdAt,
+      },
+      driver: {
+        phone: deal.driver.phoneNumber,
+        walletAddress: deal.driver.walletAddress,
+        fullName: deal.driver.fullName || null,
+        nationalId: deal.driver.nationalId || null,
+        location: deal.driver.location || null,
+        registeredAt: deal.driver.createdAt,
+      },
+      receiver: {
+        phone: deal.receiver.phoneNumber,
+        walletAddress: deal.receiver.walletAddress,
+        fullName: deal.receiver.fullName || null,
+        nationalId: deal.receiver.nationalId || null,
+        location: deal.receiver.location || null,
+        registeredAt: deal.receiver.createdAt,
+      },
       timeline: deal.actionLogs.map((log) => ({
         action: log.action,
         actorPhone: log.actorPhone,
